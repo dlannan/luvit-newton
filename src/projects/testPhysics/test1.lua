@@ -24,32 +24,6 @@ local identM = gutil.identityMatrix()
 
 ------------------------------------------------------------------------------------------------------------
 
-function gluPerspective( fovy, aspect, zNear, zFar )
-
-    gl.glMatrixMode(gl.GL_PROJECTION)
-    gl.glLoadIdentity()
-    local ymax = zNear * math.tan( fovy * math.pi / 360.0 )
-    local ymin = -ymax
-    local xmin = ymin * aspect
-    local xmax = ymax * aspect
-
-    gl.glFrustum( xmin, xmax, ymin, ymax, zNear, zFar )
-end
-
-------------------------------------------------------------------------------------------------------------
-
-function gluCamera( x, y, z, yaw, pitch, roll )
-
-    gl.glMatrixMode(gl.GL_MODELVIEW)
-    gl.glLoadIdentity()
-    gl.glRotated(pitch, 1, 0, 0)
-    gl.glRotated(yaw, 0, 1, 0)
-    gl.glRotated(roll, 0, 0, 1)
-    gl.glTranslated(-x, -y, -z)
-end
-
-------------------------------------------------------------------------------------------------------------
-
 -- local basicCarParameters = ffi.new("BasciCarParameters[1]", 
 -- {
 -- 	[0] = 2500.0,	-- MASS
@@ -302,8 +276,8 @@ function simApp:Update( )
     gl.glClear(bit.bor(gl.GL_COLOR_BUFFER_BIT, gl.GL_DEPTH_BUFFER_BIT))
 
     -- Setup the view of the cube. 
-    gluPerspective( 60.0, 1.0, 0.5, 100.0 )   
-    gluCamera( 10.0, 3.0, 10.0, 310.0, 10.0, 0.0 )
+    vis:Perspective( 60.0, 1.0, 0.5, 100.0 )   
+    vis:Camera( 10.0, 3.0, 10.0, 310.0, 10.0, 0.0 )
     
     vis:DrawPlane(100, 5)
 

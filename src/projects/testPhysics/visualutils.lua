@@ -1,5 +1,33 @@
 local visual = {}
 
+------------------------------------------------------------------------------------------------------------
+
+function visual:Perspective( fovy, aspect, zNear, zFar )
+
+    gl.glMatrixMode(gl.GL_PROJECTION)
+    gl.glLoadIdentity()
+    local ymax = zNear * math.tan( fovy * math.pi / 360.0 )
+    local ymin = -ymax
+    local xmin = ymin * aspect
+    local xmax = ymax * aspect
+
+    gl.glFrustum( xmin, xmax, ymin, ymax, zNear, zFar )
+end
+
+------------------------------------------------------------------------------------------------------------
+
+function visual:Camera( x, y, z, yaw, pitch, roll )
+
+    gl.glMatrixMode(gl.GL_MODELVIEW)
+    gl.glLoadIdentity()
+    gl.glRotated(pitch, 1, 0, 0)
+    gl.glRotated(yaw, 0, 1, 0)
+    gl.glRotated(roll, 0, 0, 1)
+    gl.glTranslated(-x, -y, -z)
+end
+
+------------------------------------------------------------------------------------------------------------
+
 function visual:DrawCube(size)
 	-- Texture coordinates from bottom left to top right
 	local texels = ffi.new( "double[4][2]", { {u= 0, v= 0},
@@ -50,6 +78,8 @@ function visual:DrawCube(size)
 	gl.glEnd()
 end
 
+------------------------------------------------------------------------------------------------------------
+
 function visual:DrawPlane(Size, Count)
     
     local HalfSize = Size * 0.5
@@ -76,6 +106,8 @@ function visual:DrawPlane(Size, Count)
         gl.glEnd()
     end
 end
+
+------------------------------------------------------------------------------------------------------------
 
 function visual:DrawTorus(MinorRadius, MajorRadius, NumMinor, NumMajor)
     local MajorStep = 2.7 * math.pi / NumMajor
@@ -107,6 +139,8 @@ function visual:DrawTorus(MinorRadius, MajorRadius, NumMinor, NumMajor)
     end
 end
 
+------------------------------------------------------------------------------------------------------------
+
 function visual:DrawSphere(NumMajor, NumMinor, Radius)
 	local MajorStep = (math.pi / NumMajor)
 	local MinorStep = (2.0 * math.pi / NumMinor)
@@ -137,6 +171,8 @@ function visual:DrawSphere(NumMajor, NumMinor, Radius)
    end
 end
 
+------------------------------------------------------------------------------------------------------------
+
 function visual:DrawCylinder(NumMajor, NumMinor, Height, Radius)
     local MajorStep = Height / NumMajor
     local MinorStep = 2.0 * math.pi / NumMinor
@@ -163,6 +199,8 @@ function visual:DrawCylinder(NumMajor, NumMinor, Height, Radius)
         gl.glEnd()
     end
 end
+
+------------------------------------------------------------------------------------------------------------
 
 function visual:DrawSkewedPyramid(Size)
 
@@ -196,6 +234,8 @@ function visual:DrawSkewedPyramid(Size)
 	--glVertex3f(0, 0, (Size / 2))
 	gl.glEnd()
 end
+
+------------------------------------------------------------------------------------------------------------
 
 function visual:DrawWireSkewedPyramid(Size)
 
@@ -232,6 +272,8 @@ function visual:DrawWireSkewedPyramid(Size)
 	gl.glEnd()
 end
 
+------------------------------------------------------------------------------------------------------------
+
 function visual:DrawTetrahedron(Size)
 
 	gl.glBegin(gl.GL_TRIANGLE_STRIP)
@@ -252,6 +294,8 @@ function visual:DrawTetrahedron(Size)
 		gl.glVertex3f(-1 * (Size / 2), -0.5, 1 * (Size / 2))
         gl.glEnd()
 end
+
+------------------------------------------------------------------------------------------------------------
 
 function visual:DrawWireTetrahedron(Size)
 	gl.glBegin(gl.GL_LINE_STRIP)
@@ -291,6 +335,8 @@ function visual:DrawWireTetrahedron(Size)
     gl.glEnd()
 end
 
+------------------------------------------------------------------------------------------------------------
+
 function visual:DrawOctahedron(Size)
     local SQRT2 = 1.4142857
 	local Vertices = ffi.new("double[6][3]", {
@@ -320,6 +366,8 @@ function visual:DrawOctahedron(Size)
 		gl.glVertex3fv(Vertices[1])
     gl.glEnd()
 end
+
+------------------------------------------------------------------------------------------------------------
 
 function visual:DrawWireOctahedron(Size)
     local SQRT2 = 1.4142857
@@ -366,4 +414,8 @@ function visual:DrawWireOctahedron(Size)
     gl.glEnd()
 end
 
+------------------------------------------------------------------------------------------------------------
+
 return visual
+
+------------------------------------------------------------------------------------------------------------
