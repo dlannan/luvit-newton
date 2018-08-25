@@ -7,14 +7,15 @@
 --
 local ffi = require( "ffi" )
 
-local libs = ffi_bullet_libs or {
+local libs = ffi_newton_libs or {
+    --Windows = { x86 = "bin/newton_d.dll", x64 = "bin/newton_d.dll" },
     Windows = { x86 = "bin/newton.dll", x64 = "bin/newton.dll" },
     OSX     = { x86 = "/usr/lib/newton.dylib", x64 = "/usr/lib/newton.dylib" },
     Linux   = { x86 = "newton", x64 = "newton", arm = "newton" },
 }
 
-local lib   = ffi_bullet_libs or libs[ ffi.os ][ ffi.arch ]
-local bullet= ffi.load( lib )
+local lib   = ffi_newton_libs or libs[ ffi.os ][ ffi.arch ]
+local newton= ffi.load( lib )
 
 ffi.cdef [[
 
@@ -1323,7 +1324,57 @@ ffi.cdef [[
         dMatrix m_tireaLigment;
     };
     
+]]
 
-    ]]
+local helpers = {}
+helpers.zeroMatrix = function()
 
-return bullet
+    local dmat = ffi.new("dMatrix[1]")
+    dmat[0].m_front.m_x = 0.0
+    dmat[0].m_front.m_y = 0.0
+    dmat[0].m_front.m_z = 0.0
+    dmat[0].m_front.m_w = 0.0
+
+    dmat[0].m_up.m_x = 0.0
+    dmat[0].m_up.m_y = 0.0
+    dmat[0].m_up.m_z = 0.0
+    dmat[0].m_up.m_w = 0.0
+
+    dmat[0].m_right.m_x = 0.0
+    dmat[0].m_right.m_y = 0.0
+    dmat[0].m_right.m_z = 0.0
+    dmat[0].m_right.m_w = 0.0
+
+    dmat[0].m_posit.m_x = 0.0
+    dmat[0].m_posit.m_y = 0.0
+    dmat[0].m_posit.m_z = 0.0
+    dmat[0].m_posit.m_w = 0.0
+    return dmat
+end
+
+helpers.identityMatrix = function()
+
+    local dmat = ffi.new("dMatrix[1]")
+    dmat[0].m_front.m_x = 1.0
+    dmat[0].m_front.m_y = 0.0
+    dmat[0].m_front.m_z = 0.0
+    dmat[0].m_front.m_w = 0.0
+
+    dmat[0].m_up.m_x = 0.0
+    dmat[0].m_up.m_y = 1.0
+    dmat[0].m_up.m_z = 0.0
+    dmat[0].m_up.m_w = 0.0
+
+    dmat[0].m_right.m_x = 0.0
+    dmat[0].m_right.m_y = 0.0
+    dmat[0].m_right.m_z = 1.0
+    dmat[0].m_right.m_w = 0.0
+
+    dmat[0].m_posit.m_x = 0.0
+    dmat[0].m_posit.m_y = 0.0
+    dmat[0].m_posit.m_z = 0.0
+    dmat[0].m_posit.m_w = 1.0
+    return dmat
+end 
+
+return { newton, helpers }

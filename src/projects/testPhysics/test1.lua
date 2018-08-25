@@ -1,18 +1,24 @@
 
 local ffi = require("ffi")
 uv = require("uv")
-gnewt  = require( "ffi/newtoncapi" )
-local timer = require('timer') 
+newton  = require( "ffi/newtoncapi" )
+gnewt = newton[1]
+gutil = newton[2]
+
+------------------------------------------------------------------------------------------------------------
+
+local timer = require("timer") 
+
+local gl    = require( "ffi/OpenGL" )
+local glu   = require( "ffi/glu" )
+
+local glfw = require 'ffi/glfw' ('glfw3')
+local GLFW = glfw.const
 
 ------------------------------------------------------------------------------------------------------------
 
 local simApp = {}
-local identM = 	ffi.new("double[16]", { 
-    [0]=1.0, 0.0, 0.0, 0.0,
-    0.0, 1.0, 0.0, 0.0, 
-    0.0, 0.0, 1.0, 0.0,
-    0.0, 0.0, 0.0, 1.0
-})
+local identM = gutil.identityMatrix()
 
 ------------------------------------------------------------------------------------------------------------
 
@@ -72,64 +78,70 @@ local Ccyan = ffi.new( "double[4]",{ [0]=0.0, 1.0, 1.0, 1.0 } )
 
 ------------------------------------------------------------------------------------------------------------
 
+function simApp:makeGround( )
 
-function simApp:MakeChassisShape( collisionMask )
+    local points = ffi.new("dFloat[4][3]", {
+        {-100.0, 0.0,  100.0}, 
+        { 100.0, 0.0,  100.0}, 
+        { 100.0, 0.0, -100.0}, 
+        {-100.0, 0.0, -100.0}, 
+    })
 
-    local workd = gnewt.GetWorld()
+    -- crate a collision tree
+    local collision = gnewt.NewtonCreateTreeCollision (self.client, 0)
 
-    --local shape = dNewtonCollisionCompound(workd, 0);
+    -- start building the collision mesh
+    gnewt.NewtonTreeCollisionBeginBuild (collision)
 
-    -- dMatrix offset (dGetIdentityMatrix());
-    -- offset.m_posit.m_y = 0.7f;
+    -- add the face one at a time
+    gnewt.NewtonTreeCollisionAddFace (collision, 4, ffi.cast("const double *const", points), 3 * ffi.sizeof("dFloat"), 0);
 
-    -- dNewtonCollisionConvexHull convex0 (workd, 8, &VehicleHullShape0[0][0], 3 * sizeof (dFloat), 0.001f, collisionMask);
-    -- dNewtonCollisionConvexHull convex1 (workd, 8, &VehicleHullShape1[0][0], 3 * sizeof (dFloat), 0.001f, collisionMask);
-    -- convex1.SetMatrix (&offset[0][0]);
+    -- finish building the collision
+    gnewt.NewtonTreeCollisionEndBuild (collision, 1)
 
-    -- shape.BeginAddRemoveCollision();
-    -- shape.AddCollision (&convex0);
-    -- shape.AddCollision (&convex1);
-    -- shape.EndAddRemoveCollision();
-    return shape
+    -- create a body with a collision and locate at the identity matrix position 
+    local body = gnewt.NewtonCreateDynamicBody(self.client, collision, ffi.cast("const double *const", identM))
+
+    -- do no forget to destroy the collision after you not longer need it
+    gnewt.NewtonDestroyCollision(collision);
+    return body
 end
 
 ------------------------------------------------------------------------------------------------------------
 
-function ApplyGravity (body, timestep, threadIndex)
+function ApplyGravity(body, timestep, threadIndex)
 
 	-- apply gravity force to the body
-	local mass
-	local Ixx
-	local Iyy
-	local Izz
+    local mass = ffi.new("double[1]")
+	local Ixx = ffi.new("double[1]")
+	local Iyy = ffi.new("double[1]")
+	local Izz = ffi.new("double[1]")
 
-	gnewt.NewtonBodyGetMass(body, mass, Ixx, Iyy, Izz);
-	gravityForce = ffi.new("struct gravityForce[1]", {[0] = 0.0, -9.8 * mass, 0.0, 0.0})
+    gnewt.NewtonBodyGetMass(body, mass, Ixx, Iyy, Izz)
+	local gravityForce = ffi.new("double[4]", {[0]=0.0, -9.8 * mass[0], 0.0, 0.0})
 	gnewt.NewtonBodySetForce(body, gravityForce)
 end
 
 ------------------------------------------------------------------------------------------------------------
-local idc = 2
+idc = 2
 
 function simApp:makeBall( x, y, z, r )
 
     local shapeId = idc 
     idc = idc + 1
 	-- crate a collision sphere
-    local offM = ffi.new("double[9]", {[0]=0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0})
-    local coll = gnewt.NewtonCreateSphere( self.client, r, shapeId, offM)
+    local offM = gutil.identityMatrix()
+    local coll = gnewt.NewtonCreateSphere( self.client, r, shapeId, ffi.cast("const double *const", offM))
 
 	-- create a dynamic body with a sphere shape, and 
-    local iM = ffi.new("double[16]", {
-        [0]=1.0, 0.0, 0.0, 0.0, 
-        0.0, 1.0, 0.0, 0.0, 
-        0.0, 0.0, 1.0, 0.0,
-        z, y, z, 1.0
-    })
-	local body = gnewt.NewtonCreateDynamicBody(self.client, coll, iM);
+    local iM = gutil.identityMatrix()
+    iM[0].m_posit.m_x = x
+    iM[0].m_posit.m_y = y
+    iM[0].m_posit.m_z = z
+	local body = gnewt.NewtonCreateDynamicBody(self.client, coll, ffi.cast("const double *const", iM))
 
 	-- set the force callback for applying the force and torque
-	gnewt.NewtonBodySetForceAndTorqueCallback(body, ApplyGravity)
+	gnewt.NewtonBodySetForceAndTorqueCallback(body, ffi.cast("NewtonApplyForceAndTorque", ApplyGravity))
 
 	-- set the mass for this body
 	local mass = 1.0
@@ -144,50 +156,93 @@ function simApp:makeBall( x, y, z, r )
 end
 
 ------------------------------------------------------------------------------------------------------------
+
+function simApp:updateBall( ball )
+
+    gl.glPushMatrix()
+    gl.glColor3f(1,0,0)
+    if ball.quad == nil then
+        ball.quad = glu.gluNewQuadric()
+    end
+
+    local pos = ffi.cast("struct dMatrix *", ball.mat).m_posit
+    gl.glTranslatef(pos.m_x, pos.m_y, pos.m_z)
+    glu.gluSphere(ball.quad, 1.0, 5, 5)
+    gl.glPopMatrix()
+end
+
+------------------------------------------------------------------------------------------------------------
+
+function windowClosing()
+
+    p("Stopping timer...")
+    simApp.timer.clearInterval( simApp.sdltimer)
+end
+
+------------------------------------------------------------------------------------------------------------
 -- simStartup - general initialisation
 
 function simApp:Startup()
 
     self.timer = require('timer') 
+    -- Initialize the library
+    if glfw.Init() == 0 then
+        return
+    end
+
+    -- Create a windowed mode window and its OpenGL context
+    self.window = glfw.CreateWindow(640, 480, "Hello World")
+    p(self.window)
+    if self.window == 0 then
+        glfw.Terminate()
+        return
+    end
+
+    -- Make the window's context current
+    glfw.MakeContextCurrent(self.window)
+    glfw.SetWindowCloseCallback( self.window, windowClosing )
+
+    gl.glClearColor( 0.55, 0.55, 0.55, 0 )
+    gl.glShadeModel( gl.GL_SMOOTH ) 
 
     ------------------------------------------------------------------------------------------------------------
     -- Start the GUI Server -- need to kill it on exit too.
     if serverLaunched == nil then
-        self.timer.sleep(1000)
         serverLaunched = true
     end
 
     ------------------------------------------------------------------------------------------------------------
+    -- Now load in some models.
+    world = {}
 
-    self.client = gnewt.NewtonCreate();
-    self.timer.sleep(500)
+    ------------------------------------------------------------------------------------------------------------
 
-    --local cmd = gnewt.b3InitResetSimulationCommand(self.client)
-    --local status = gnewt.b3SubmitClientCommandAndWaitStatus(self.client, cmd);
+    self.client = gnewt.NewtonCreate()
+	-- for deterministic behavior call this function each time you change the world
+    gnewt.NewtonInvalidateCache (self.client)
+    
+    -- create a static body to serve as the floor.
+    world.physId = 1
+    p("Adding world...", world.physId)   
+    world.phys = self:makeGround( world.physId )
+
     ------------------------------------------------------------------------------------------------------------
     -- Some timers for use later
     self.time_start = os.time()
     self.time_last = os.clock()
 
     ------------------------------------------------------------------------------------------------------------
-    -- Now load in some models.
-    world = {}
-
-    -- Load the world urdf
-    local offM = ffi.new("double[16]", {[0]=0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0})
-    world.physId = 1
-    world.phys = gnewt.NewtonCreateBox(self.client, 0.0, 0.0, 0.0, world.physId, offM)
-    p("Adding world...", world.physId)   
-
-    ------------------------------------------------------------------------------------------------------------
     -- Note: The visual shape doesnt seem to seperately instance for each object
     --       so each object shares the same visual shape because they are identical
-    balls = {}
-    balls.test1 = self:makeBall(1.0, 0.0, 1.5, 0.5)    
+    balls = { test1={}, test2={}, test3={} }
+    balls.test1.body = self:makeBall(1.0, 1.0, 1.0, 0.5)  
+    balls.test1.mat = ffi.new("double[16]")
     p("Adding Ball...", balls.test1)
-    balls.test2 = self:makeBall(0.0, 0.0, 1.0, 0.5)    
+    balls.test2.body = self:makeBall(0.0, 4.0, 4.0, 0.5)    
+    balls.test2.mat = ffi.new("double[16]")
     p("Adding Ball...", balls.test2)
-    balls.test3 = self:makeBall(-1.0, 0.0, 0.5, 0.5)    
+    balls.test3.body = self:makeBall(-5.0, 2.0, 2.0, 0.5)    
+    balls.test3.mat = ffi.new("double[16]")
     p("Adding Ball...", balls.test3)
     -- Set sim to unitialised.
     self.simInit = 0
@@ -205,7 +260,7 @@ function simApp:Update( )
     -- On the first step do some initialisation - seems to be necessary here.
     if self.simInit == 0 and self.client ~= nil then
         self.simInit = 1
-        gnewt.NewtonSetNumberOfSubsteps(self.client, 6)
+        --gnewt.NewtonSetNumberOfSubsteps(self.client, 6)
     end
 
     -- Physics updates - this will go in a coroutine.. to make it nice to run
@@ -214,10 +269,33 @@ function simApp:Update( )
     self.time_last = time_current
 
     if self.client ~= nil then
-        p("tstep:", dtime)
+        --p("tstep:", dtime)
         -- Update the physics  -- Can use Async here, will look at later.
-        local cmd = gnewt.NewtonUpdate(self.client, dtime)
+        gnewt.NewtonUpdate(self.client, dtime)
     end
+
+    gl.glClear(bit.bor(gl.GL_COLOR_BUFFER_BIT, gl.GL_DEPTH_BUFFER_BIT))
+    glu.gluLookAt( -5, 5, -5, 0, 0, 0, 0, 1, 0)
+
+    -- Go through the objects and update their visual. 
+    gnewt.NewtonBodyGetMatrix (balls.test1.body , balls.test1.mat)
+    self:updateBall( balls.test1 )
+    local pos = ffi.cast("dMatrix *", balls.test1.mat).m_posit
+    p(pos.m_x, pos.m_y, pos.m_z)
+    gnewt.NewtonBodyGetMatrix (balls.test2.body , balls.test2.mat)
+    self:updateBall( balls.test2 )
+    local pos = ffi.cast("dMatrix *", balls.test2.mat).m_posit
+    p(pos.m_x, pos.m_y, pos.m_z)
+    gnewt.NewtonBodyGetMatrix (balls.test3.body , balls.test3.mat)
+    self:updateBall( balls.test3 )
+    local pos = ffi.cast("dMatrix *", balls.test3.mat).m_posit
+    p(pos.m_x, pos.m_y, pos.m_z)
+
+    -- Swap front and back buffers
+    glfw.SwapBuffers(self.window)
+
+    -- Poll for and process events
+    glfw.PollEvents()
 end
 
 ------------------------------------------------------------------------------------------------------------
@@ -235,5 +313,6 @@ p("Closing...")
 ------------------------------------------------------------------------------------------------------------
 
 gnewt.NewtonDestroy(simApp.client)
+glfw.Terminate()
 
 ------------------------------------------------------------------------------------------------------------
