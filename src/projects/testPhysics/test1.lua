@@ -9,16 +9,44 @@ gutil = newton[2]
 
 local timer = require("timer") 
 
-local gl    = require( "ffi/OpenGL" )
-local glu   = require( "ffi/glu" )
+gl    = require( "ffi/OpenGL" )
+glu   = require( "ffi/glu" )
 
-local glfw = require 'ffi/glfw' ('glfw3')
-local GLFW = glfw.const
+glfw = require 'ffi/glfw' ('glfw3')
+GLFW = glfw.const
+
+local vis   = require("visualutils")
 
 ------------------------------------------------------------------------------------------------------------
 
 local simApp = {}
 local identM = gutil.identityMatrix()
+
+------------------------------------------------------------------------------------------------------------
+
+function gluPerspective( fovy, aspect, zNear, zFar )
+
+    gl.glMatrixMode(gl.GL_PROJECTION)
+    gl.glLoadIdentity()
+    local ymax = zNear * math.tan( fovy * math.pi / 360.0 )
+    local ymin = -ymax
+    local xmin = ymin * aspect
+    local xmax = ymax * aspect
+
+    gl.glFrustum( xmin, xmax, ymin, ymax, zNear, zFar )
+end
+
+------------------------------------------------------------------------------------------------------------
+
+function gluCamera( x, y, z, yaw, pitch, roll )
+
+    gl.glMatrixMode(gl.GL_MODELVIEW)
+    gl.glLoadIdentity()
+    gl.glRotated(pitch, 1, 0, 0)
+    gl.glRotated(yaw, 0, 1, 0)
+    gl.glRotated(roll, 0, 0, 1)
+    gl.glTranslated(-x, -y, -z)
+end
 
 ------------------------------------------------------------------------------------------------------------
 
@@ -161,13 +189,10 @@ function simApp:updateBall( ball )
 
     gl.glPushMatrix()
     gl.glColor3f(1,0,0)
-    if ball.quad == nil then
-        ball.quad = glu.gluNewQuadric()
-    end
 
-    local pos = ffi.cast("struct dMatrix *", ball.mat).m_posit
+    local pos = ffi.cast("dMatrix *", ball.mat).m_posit
     gl.glTranslatef(pos.m_x, pos.m_y, pos.m_z)
-    glu.gluSphere(ball.quad, 1.0, 5, 5)
+    vis:DrawSphere(8, 8, 1.0)
     gl.glPopMatrix()
 end
 
@@ -275,21 +300,25 @@ function simApp:Update( )
     end
 
     gl.glClear(bit.bor(gl.GL_COLOR_BUFFER_BIT, gl.GL_DEPTH_BUFFER_BIT))
-    glu.gluLookAt( -5, 5, -5, 0, 0, 0, 0, 1, 0)
+
+    -- Setup the view of the cube. 
+    gluPerspective( 60.0, 1.0, 0.5, 100.0 )   
+    gluCamera( 10.0, 3.0, 10.0, 310.0, 10.0, 0.0 )
+    
+    vis:DrawPlane(100, 5)
 
     -- Go through the objects and update their visual. 
     gnewt.NewtonBodyGetMatrix (balls.test1.body , balls.test1.mat)
     self:updateBall( balls.test1 )
     local pos = ffi.cast("dMatrix *", balls.test1.mat).m_posit
-    p(pos.m_x, pos.m_y, pos.m_z)
+
     gnewt.NewtonBodyGetMatrix (balls.test2.body , balls.test2.mat)
     self:updateBall( balls.test2 )
     local pos = ffi.cast("dMatrix *", balls.test2.mat).m_posit
-    p(pos.m_x, pos.m_y, pos.m_z)
+
     gnewt.NewtonBodyGetMatrix (balls.test3.body , balls.test3.mat)
     self:updateBall( balls.test3 )
     local pos = ffi.cast("dMatrix *", balls.test3.mat).m_posit
-    p(pos.m_x, pos.m_y, pos.m_z)
 
     -- Swap front and back buffers
     glfw.SwapBuffers(self.window)
