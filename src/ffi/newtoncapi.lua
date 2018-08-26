@@ -1390,7 +1390,7 @@ dVectorScale = function( dvec, scale )
 	nvec[0].m_x = dvec[0].m_x * scale
 	nvec[0].m_y = dvec[0].m_y * scale
 	nvec[0].m_z = dvec[0].m_z * scale
-	nvec[0].m_w = dvec[0].m_w * scale
+	nvec[0].m_w = dvec[0].m_w
 	return nvec
 end
 
@@ -1410,7 +1410,7 @@ dVectorAdd = function (vec1, vec2)
 	nvec[0].m_x = vec1.m_x + vec2.m_x
 	nvec[0].m_y = vec1.m_y + vec2.m_y
 	nvec[0].m_z = vec1.m_z + vec2.m_z
-	nvec[0].m_w = vec1.m_w + vec2.m_w
+	nvec[0].m_w = vec1.m_w
 	return nvec
 end
 

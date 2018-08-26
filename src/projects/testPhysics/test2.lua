@@ -22,6 +22,9 @@ local vis   = require("visualutils")
 local simApp = {}
 local identM = gutil.identityMatrix()
 
+local m_waterToSolidVolumeRatio = 0.9
+local m_plane = ffi.new("double[4]", { [0]=0.0, 1.0, 0.0, 1.5 })
+
 ------------------------------------------------------------------------------------------------------------
 
 -- local basicCarParameters = ffi.new("BasciCarParameters[1]", 
@@ -119,35 +122,37 @@ function ApplyGravity(body, timestep, threadIndex)
 	local Ixx = ffi.new("double[1]")
 	local Iyy = ffi.new("double[1]")
     local Izz = ffi.new("double[1]")
-    local pos = ffi.new("double[4]")
 
     gnewt.NewtonBodyGetMass(body, mass, Ixx, Iyy, Izz)
+
+    local pos = ffi.new("double[4]")
     gnewt.NewtonBodyGetPosition( body, pos )
+
     local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(body))
 -- p(pos[0], pos[1], pos[2])
 
     -- Must be below the plane to apply buoyancy
-    if pos[1] < -udata[0].radius then
+    if pos[1] < 0.0 then
     local cog = ffi.new("dVector[1]")
+    cog[0] = { [0]=0.0, 0.0, 0.0, 0.0 }
     local accelPerUnitMass = ffi.new("dVector[1]")
     local torquePerUnitMass = ffi.new("dVector[1]")
-    local gravity = ffi.new("double[4]", { 0.0, -9.8, 0.0, 0.0 })
-    local m_plane = ffi.new("double[4]", { 0.0, 1.0, 0.0, 0.0 })
-    local m_waterToSolidVolumeRatio = 0.7
     local matrix = ffi.new("dMatrix[1]")
+    local gravity = ffi.new("double[4]", { [0]=0.0, -9.8, 0.0, 0.0 })
 
     gnewt.NewtonBodyGetMatrix (body, ffi.cast("dFloat *", matrix))
     gnewt.NewtonBodyGetCentreOfMass(body, ffi.cast("dFloat *", cog))
     cog = dMatrixTransformVector(matrix, cog)
+    --p("COG:", cog[0].m_x, cog[0].m_y, cog[0].m_z, cog[0].m_w)
 
     local collision = gnewt.NewtonBodyGetCollision(body)
     local shapeVolume = gnewt.NewtonConvexCollisionCalculateVolume(collision)
-    local fluidDentity = 1.0 / (m_waterToSolidVolumeRatio * shapeVolume)
+    local fluidDensity = 1.0 / (m_waterToSolidVolumeRatio * shapeVolume)
     local viscosity = 0.995
 
     gnewt.NewtonConvexCollisionCalculateBuoyancyAcceleration (collision, 
                 ffi.cast("dFloat *", matrix), 
-                ffi.cast("dFloat *", cog), gravity, m_plane, fluidDentity, viscosity, 
+                ffi.cast("dFloat *", cog), gravity, m_plane, fluidDensity, viscosity, 
                 ffi.cast("dFloat *", accelPerUnitMass), 
                 ffi.cast("dFloat *", torquePerUnitMass))
 
@@ -155,6 +160,7 @@ function ApplyGravity(body, timestep, threadIndex)
     local torque = dVectorScale(torquePerUnitMass, mass[0])
 
     local omega = ffi.new("dVector[1]")
+    omega[0] = { [0]=0.0, 0.0, 0.0, 0.0 }
     gnewt.NewtonBodyGetOmega(body, ffi.cast("dFloat *", omega))
     omega = dVectorScale (omega, viscosity)
     gnewt.NewtonBodySetOmega(body, ffi.cast("dFloat *", omega))
@@ -162,10 +168,10 @@ function ApplyGravity(body, timestep, threadIndex)
     gnewt.NewtonBodyAddForce (body, ffi.cast("dFloat *", force))
     gnewt.NewtonBodyAddTorque (body, ffi.cast("dFloat *", torque))
     
-    else 
+    else
 
 	local gravityForce = ffi.new("double[4]", {[0]=0.0, -9.8 * mass[0], 0.0, 0.0})
-    gnewt.NewtonBodySetForce(body, gravityForce)
+    gnewt.NewtonBodyAddForce(body, gravityForce)
     end
 end
 
@@ -179,7 +185,7 @@ function simApp:makeBall( x, y, z, r, mass )
 	-- crate a collision sphere
     local offM = gutil.identityMatrix()
     local coll = gnewt.NewtonCreateSphere( self.client, r, shapeId, ffi.cast("const double *const", offM))
-
+    
 	-- create a dynamic body with a sphere shape, and 
     local iM = gutil.identityMatrix()
     iM[0].m_posit.m_x = x
@@ -194,7 +200,9 @@ function simApp:makeBall( x, y, z, r, mass )
 	gnewt.NewtonBodySetMassProperties(body, mass, coll)
 
 	-- set the linear damping to zero
-	gnewt.NewtonBodySetLinearDamping (body, 0.0)
+    -- gnewt.NewtonBodySetLinearDamping (body, 0.1)
+    local defMatId = gnewt.NewtonMaterialGetDefaultGroupID( self.client)
+    gnewt.NewtonBodySetMaterialGroupID(body, defMatId)
 
 	-- do no forget to destroy the collision after you not longer need it
     gnewt.NewtonDestroyCollision(coll)
@@ -303,13 +311,13 @@ function simApp:Startup()
     -- Note: The visual shape doesnt seem to seperately instance for each object
     --       so each object shares the same visual shape because they are identical
     balls = { test1={}, test2={}, test3={} }
-    balls.test1.body = self:makeBall(1.0, 1.0, 1.0, 1.5, 10.0)  
+    balls.test1.body = self:makeBall(15.0, 15.0, 15.0, 5.0, 10.0)  
     balls.test1.mat = ffi.new("double[16]")
     p("Adding Ball...", balls.test1)
-    balls.test2.body = self:makeBall(0.0, 4.0, 4.0, 2.5, 5.0)    
+    balls.test2.body = self:makeBall(10.0, 15.0, 14.0, 5.0, 10.0)    
     balls.test2.mat = ffi.new("double[16]")
     p("Adding Ball...", balls.test2)
-    balls.test3.body = self:makeBall(-5.0, 2.0, 2.0, 1.5, 10.0)    
+    balls.test3.body = self:makeBall(-15.0, 15.0, 12.0, 5.0, 10.0)    
     balls.test3.mat = ffi.new("double[16]")
     p("Adding Ball...", balls.test3)
     -- Set sim to unitialised.
