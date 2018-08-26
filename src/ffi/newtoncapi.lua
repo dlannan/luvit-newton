@@ -306,6 +306,13 @@ ffi.cdef [[
         dVector m_posit;
     } dMatrix;
 
+	typedef struct userData {
+		dFloat 	radius;
+		dFloat	mass;
+		dFloat 	k1;
+		dFloat 	k2;
+	} userData;
+
 	// Newton callback functions
 	typedef void* (*NewtonAllocMemory) (int sizeInBytes);
 	typedef void (*NewtonFreeMemory) (void* const ptr, int sizeInBytes);
@@ -1376,5 +1383,41 @@ helpers.identityMatrix = function()
     dmat[0].m_posit.m_w = 1.0
     return dmat
 end 
+
+dVectorScale = function( dvec, scale )
+
+	local nvec = ffi.new("dVector[1]")
+	nvec[0].m_x = dvec[0].m_x * scale
+	nvec[0].m_y = dvec[0].m_y * scale
+	nvec[0].m_z = dvec[0].m_z * scale
+	nvec[0].m_w = dvec[0].m_w * scale
+	return nvec
+end
+
+dMatrixRotateVector = function( dm, v )
+
+	local nvec = ffi.new("dVector[1]")
+	nvec[0].m_x = v.m_x * dm.m_front.m_x + v.m_y * dm.m_up.m_x + v.m_z * dm.m_right.m_x
+	nvec[0].m_y = v.m_x * dm.m_front.m_y + v.m_y * dm.m_up.m_y + v.m_z * dm.m_right.m_y
+	nvec[0].m_z = v.m_x * dm.m_front.m_z + v.m_y * dm.m_up.m_z + v.m_z * dm.m_right.m_z
+	nvec[0].m_w = 0.0
+	return nvec
+end
+
+dVectorAdd = function (vec1, vec2)
+
+	local nvec = ffi.new("dVector[1]")
+	nvec[0].m_x = vec1.m_x + vec2.m_x
+	nvec[0].m_y = vec1.m_y + vec2.m_y
+	nvec[0].m_z = vec1.m_z + vec2.m_z
+	nvec[0].m_w = vec1.m_w + vec2.m_w
+	return nvec
+end
+
+dMatrixTransformVector = function ( dmat, vec )
+
+	local res = dMatrixRotateVector( dmat[0], vec[0] )
+	return dVectorAdd(dmat[0].m_posit, res[0])
+end
 
 return { newton, helpers }

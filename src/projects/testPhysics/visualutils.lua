@@ -20,9 +20,9 @@ function visual:Camera( x, y, z, yaw, pitch, roll )
 
     gl.glMatrixMode(gl.GL_MODELVIEW)
     gl.glLoadIdentity()
-    gl.glRotated(pitch, 1, 0, 0)
+    gl.glRotated(360-pitch, 1, 0, 0)
     gl.glRotated(yaw, 0, 1, 0)
-    gl.glRotated(roll, 0, 0, 1)
+    gl.glRotated(360-roll, 0, 0, 1)
     gl.glTranslated(-x, -y, -z)
 end
 
@@ -66,7 +66,6 @@ function visual:DrawCube(size)
 		-- Set normal for this face
 		gl.glNormal3fv(cubenormals[i][0])
 		for j=0,3 do
-
 			-- Texture coordinates for this vertex in texels
 			gl.glTexCoord2f(texels[j][0], texels[j][1])
 			-- Position for this vertex, object position NOT world position
@@ -83,7 +82,6 @@ end
 function visual:DrawPlane(Size, Count)
     
     local HalfSize = Size * 0.5
-    gl.glColor3f(0.0, 1.0, 0.0)
     local MajorStep = Size / Count
     for i=0, Count do
         gl.glBegin(gl.GL_QUADS)
