@@ -26,6 +26,10 @@ local m_waterToSolidVolumeRatio = 0.9
 local m_plane = ffi.new("double[4]", { [0]=0.0, 1.0, 0.0, 1.5 })
 
 ------------------------------------------------------------------------------------------------------------
+-- Comment this out to disable visual rendering
+--local VISUAL    = 1
+
+------------------------------------------------------------------------------------------------------------
 
 -- local basicCarParameters = ffi.new("BasciCarParameters[1]", 
 -- {
@@ -249,7 +253,8 @@ end
 function windowClosing()
 
     p("Stopping timer...")
-    simApp.timer.clearInterval( simApp.sdltimer)
+    simApp.timer.clearInterval( simApp.phystimer)
+    simApp.timer.clearInterval( simApp.vistimer)
 end
 
 ------------------------------------------------------------------------------------------------------------
@@ -258,28 +263,30 @@ end
 function simApp:Startup()
 
     self.timer = require('timer') 
-    -- Initialize the library
-    if glfw.Init() == 0 then
-        return
-    end
-
-    -- Create a windowed mode window and its OpenGL context
-    self.window = glfw.CreateWindow(640, 480, "Hello World")
-    p(self.window)
-    if self.window == 0 then
-        glfw.Terminate()
-        return
-    end
-
     self.userDataList = {}
 
-    -- Make the window's context current
-    glfw.MakeContextCurrent(self.window)
-    glfw.SetWindowCloseCallback( self.window, windowClosing )
+    if VISUAL then
+        -- Initialize the library
+        if glfw.Init() == 0 then
+            return
+        end
 
-    gl.glClearColor( 0.55, 0.55, 0.55, 0 )
-    gl.glShadeModel( gl.GL_SMOOTH ) 
-    gl.glEnable( gl.GL_DEPTH_TEST )
+        -- Create a windowed mode window and its OpenGL context
+        self.window = glfw.CreateWindow(640, 480, "Hello World")
+        p(self.window)
+        if self.window == 0 then
+            glfw.Terminate()
+            return
+        end
+
+        -- Make the window's context current
+        glfw.MakeContextCurrent(self.window)
+        glfw.SetWindowCloseCallback( self.window, windowClosing )
+
+        gl.glClearColor( 0.55, 0.55, 0.55, 0 )
+        gl.glShadeModel( gl.GL_SMOOTH ) 
+        gl.glEnable( gl.GL_DEPTH_TEST )
+    end 
 
     ------------------------------------------------------------------------------------------------------------
     -- Start the GUI Server -- need to kill it on exit too.
@@ -325,30 +332,15 @@ function simApp:Startup()
 
     ------------------------------------------------------------------------------------------------------------
     -- Install timer update - this will call simUpdate often.
-    self.sdltimer = self.timer.setInterval(5, self.Update, self)
+    self.phystimer = self.timer.setInterval(5, self.Update, self)
+    if VISUAL then 
+        self.vistimer = self.timer.setInterval(15, self.Render, self)
+    end
 end 
 
 ------------------------------------------------------------------------------------------------------------
--- This SIM INIT method isnt ideal, but it will do for now.
 
-function simApp:Update( ) 
-
-    -- On the first step do some initialisation - seems to be necessary here.
-    if self.simInit == 0 and self.client ~= nil then
-        self.simInit = 1
-        --gnewt.NewtonSetNumberOfSubsteps(self.client, 6)
-    end
-
-    -- Physics updates - this will go in a coroutine.. to make it nice to run
-    local time_current = os.clock()
-    local dtime = time_current - self.time_last
-    self.time_last = time_current
-
-    if self.client ~= nil then
-        --p("tstep:", dtime)
-        -- Update the physics  -- Can use Async here, will look at later.
-        gnewt.NewtonUpdate(self.client, dtime)
-    end
+function simApp:Render()
 
     gl.glClear(bit.bor(gl.GL_COLOR_BUFFER_BIT, gl.GL_DEPTH_BUFFER_BIT))
 
@@ -376,6 +368,31 @@ function simApp:Update( )
 
     -- Poll for and process events
     glfw.PollEvents()
+end
+
+------------------------------------------------------------------------------------------------------------
+-- This SIM INIT method isnt ideal, but it will do for now.
+
+function simApp:Update( ) 
+
+    -- On the first step do some initialisation - seems to be necessary here.
+    if self.simInit == 0 and self.client ~= nil then
+        self.simInit = 1
+        --gnewt.NewtonSetNumberOfSubsteps(self.client, 6)
+    end
+
+    -- Physics updates - this will go in a coroutine.. to make it nice to run
+    local time_current = os.clock()
+    local dtime = time_current - self.time_last
+    self.time_last = time_current
+
+    if self.client ~= nil then
+        --p("tstep:", dtime)
+        -- Update the physics  -- Can use Async here, will look at later.
+        gnewt.NewtonUpdate(self.client, dtime)
+    end
+
+
 end
 
 ------------------------------------------------------------------------------------------------------------
