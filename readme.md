@@ -1,10 +1,10 @@
-# luvit-bullet3
-This is a simple bullet3 testing toolkit using a number of simple lua based systems. They are:
+# luvit-newton
+This is a simple newton testing toolkit using a number of simple lua based systems. They are:
 - luvit    https://github.com/luvit/luvit   A nodejs styled web toolkit using luajit
 - luajit   http://luajit.org/    A jit based lua system. Fast. Fast. And it has ffi. 
 - newton  https://github.com/MADEAPPS/newton-dynamics/   A physics engine, and one I wish I had tried before bullet :) 
 
-With these combined systems, the user has access to web capabilities, the bullet3 C API and it can be extended easily with luajit's ffi. 
+With these combined systems, the user has access to web capabilities, the newton C API and it can be extended easily with luajit's ffi. 
 
 Luvit and Luajit packages are MIT licensed. 
 Newton is zlib licensed.
