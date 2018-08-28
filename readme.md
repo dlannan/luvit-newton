@@ -19,7 +19,9 @@ All you need to run the whole thing is:
 2. A command prompt running from the /src folder:
 
 `.\bin\luvit.exe .\run_project.lua testPhysics test1.lua`
+
 or
+
 `.\bin\luvit.exe .\run_project.lua testPhysics test2.lua`
 
 Enjoy. :)
