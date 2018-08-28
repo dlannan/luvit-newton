@@ -309,8 +309,8 @@ ffi.cdef [[
 	typedef struct userData {
 		dFloat 	radius;
 		dFloat	mass;
-		dFloat 	k1;
-		dFloat 	k2;
+		dFloat 	length;
+		dFloat 	motoron;
 	} userData;
 
 	// Newton callback functions

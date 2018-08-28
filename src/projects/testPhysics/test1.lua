@@ -277,7 +277,7 @@ function simApp:Update( )
 
     -- Setup the view of the cube. 
     vis:Perspective( 60.0, 1.0, 0.5, 100.0 )   
-    vis:Camera( 10.0, 3.0, 10.0, 310.0, 10.0, 0.0 )
+    vis:Camera( -20.0, 5.0, -20.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0 )
     
     vis:DrawPlane(100, 5)
 

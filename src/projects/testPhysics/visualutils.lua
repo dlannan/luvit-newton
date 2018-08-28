@@ -1,4 +1,25 @@
 local visual = {}
+local ffi = require("ffi")
+
+------------------------------------------------------------------------------------------------------------
+
+function visual:normalize( vec )
+
+	local len = 1.0 / math.sqrt( vec.m_x * vec.m_x + vec.m_y * vec.m_y + vec.m_z * vec.m_z )
+	local tmp = ffi.new("dVector", {vec.m_x * len, vec.m_y * len, vec.m_z * len, 1.0})
+	return tmp
+end
+
+------------------------------------------------------------------------------------------------------------
+
+function visual:crossProduct( a, b ) 
+
+	result = ffi.new("dVector", {
+		a.m_y*b.m_z - a.m_z*b.m_y,
+		a.m_z*b.m_x - a.m_x*b.m_z,
+		a.m_x*b.m_y - a.m_y*b.m_x, 1.0 })
+	return result
+end
 
 ------------------------------------------------------------------------------------------------------------
 
@@ -16,14 +37,26 @@ end
 
 ------------------------------------------------------------------------------------------------------------
 
-function visual:Camera( x, y, z, yaw, pitch, roll )
+function visual:Camera( x, y, z, tx, ty, tz, ux, uy, uz )
+
+	local dir = ffi.new("dVector", { tx-x, ty-y, tz-z })
+	local vup = ffi.new("dVector", { ux, uy, uz })
+
+    local forward = self:normalize(dir)
+    local right = self:crossProduct(self:normalize(vup), forward)
+    local up = self:crossProduct(forward, right)
+ 
+    local camToWorld = ffi.new("double[16]", { 
+ 
+    	right.m_x, up.m_x, -forward.m_x, 0.0,
+    	right.m_y, up.m_y, -forward.m_y, 0.0,
+    	right.m_z, up.m_z, -forward.m_z, 0.0,
+		0.0, 0.0, 0.0, 1.0 
+	})
 
     gl.glMatrixMode(gl.GL_MODELVIEW)
-    gl.glLoadIdentity()
-    gl.glRotated(360-pitch, 1, 0, 0)
-    gl.glRotated(yaw, 0, 1, 0)
-    gl.glRotated(360-roll, 0, 0, 1)
-    gl.glTranslated(-x, -y, -z)
+	gl.glLoadMatrixd( camToWorld )
+	gl.glTranslated( -x, -y, -z )
 end
 
 ------------------------------------------------------------------------------------------------------------
@@ -171,7 +204,7 @@ end
 
 ------------------------------------------------------------------------------------------------------------
 
-function visual:DrawCylinder(NumMajor, NumMinor, Height, Radius)
+function visual:DrawCylinder(NumMajor, NumMinor, Height, radius)
     local MajorStep = Height / NumMajor
     local MinorStep = 2.0 * math.pi / NumMinor
 
@@ -183,15 +216,15 @@ function visual:DrawCylinder(NumMajor, NumMinor, Height, Radius)
         for j = 0, NumMinor do
 
             local a = j * MinorStep
-            local x = Radius * math.cos(a)
-            local y = Radius * math.sin(a)
+            local x = radius * math.cos(a)
+            local y = radius * math.sin(a)
 
             gl.glNormal3f(x / radius, y / radius, 0.0)
-            gl.glTexCoord2f(j / numMinor, i / numMajor)
+            gl.glTexCoord2f(j / NumMinor, i / NumMajor)
             gl.glVertex3f(x, y, z0)
 
             gl.glNormal3f(x / radius, y / radius, 0.0)
-            gl.glTexCoord2f(j / numMinor, (i + 1) / numMajor)
+            gl.glTexCoord2f(j / NumMinor, (i + 1) / NumMajor)
             gl.glVertex3f(x, y, z1)
         end
         gl.glEnd()

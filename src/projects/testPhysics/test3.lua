@@ -118,6 +118,21 @@ function simApp:makeGround( )
 end
 
 ------------------------------------------------------------------------------------------------------------
+local pwr = 50.0
+
+function motorOn( body, enabled )
+
+    -- if enabled apply a force, otherwise nothing?
+    if enabled == 1 then 
+        local mat = ffi.new("double[16]")
+        gnewt.NewtonBodyGetMatrix( body, mat )
+        local force = ffi.new("double[3]", { [0]=mat[2] * pwr, mat[6] * pwr, mat[10] * pwr })
+        p(force[0], force[1], force[2])
+        gnewt.NewtonBodyAddForce( body, force )
+    end
+end
+
+------------------------------------------------------------------------------------------------------------
 
 function ApplyGravity(body, timestep, threadIndex)
 
@@ -136,7 +151,7 @@ function ApplyGravity(body, timestep, threadIndex)
 -- p(pos[0], pos[1], pos[2])
 
     -- Must be below the plane to apply buoyancy
-    if pos[1] < 0.0 then
+    if pos[1] < udata[0].radius then
     local cog = ffi.new("dVector[1]")
     cog[0] = { [0]=0.0, 0.0, 0.0, 0.0 }
     local accelPerUnitMass = ffi.new("dVector[1]")
@@ -177,19 +192,22 @@ function ApplyGravity(body, timestep, threadIndex)
 	local gravityForce = ffi.new("double[4]", {[0]=0.0, -9.8 * mass[0], 0.0, 0.0})
     gnewt.NewtonBodyAddForce(body, gravityForce)
     end
+
+    -- Check motor forces
+    motorOn(body, udata[0].motoron)
 end
 
 ------------------------------------------------------------------------------------------------------------
 idc = 2
 
-function simApp:makeBall( x, y, z, r, mass )
+function simApp:makeBoatHull( x, y, z, r, length, mass )
 
     local shapeId = idc 
     idc = idc + 1
 	-- crate a collision sphere
     local offM = gutil.identityMatrix()
-    local coll = gnewt.NewtonCreateSphere( self.client, r, shapeId, ffi.cast("const double *const", offM))
-    
+    local coll = gnewt.NewtonCreateCapsule( self.client, r, r, length, shapeId, ffi.cast("const double *const", offM))
+
 	-- create a dynamic body with a sphere shape, and 
     local iM = gutil.identityMatrix()
     iM[0].m_posit.m_x = x
@@ -212,7 +230,7 @@ function simApp:makeBall( x, y, z, r, mass )
     gnewt.NewtonDestroyCollision(coll)
 
     local udata = ffi.new("userData[1]")
-    udata[0] = { r, mass, 0.0, 0.0 }
+    udata[0] = { r, mass, length, 0.0 }
     table.insert(self.userDataList, udata)
 
     gnewt.NewtonBodySetUserData(body, udata)
@@ -222,7 +240,7 @@ end
 
 ------------------------------------------------------------------------------------------------------------
 
-function simApp:updateBall( ball )
+function simApp:updateHull( ball )
 
     gl.glPushMatrix()
     gl.glColor3f(1,0,0)
@@ -231,7 +249,8 @@ function simApp:updateBall( ball )
     gl.glTranslatef(pos.m_x, pos.m_y, pos.m_z)
 
     local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(ball.body))
-    vis:DrawSphere(8, 8, udata[0].radius)
+    vis:DrawCylinder( 8, 8, udata[0].length, udata[0].radius )
+    --vis:DrawSphere(8, 8, udata[0].radius)
     gl.glPopMatrix()
 end
 
@@ -264,6 +283,8 @@ function simApp:Startup()
 
     self.timer = require('timer') 
     self.userDataList = {}
+    self.motor1 = 0
+    self.motor2 = 0
 
     if VISUAL then
         -- Initialize the library
@@ -317,16 +338,13 @@ function simApp:Startup()
     ------------------------------------------------------------------------------------------------------------
     -- Note: The visual shape doesnt seem to seperately instance for each object
     --       so each object shares the same visual shape because they are identical
-    balls = { test1={}, test2={}, test3={} }
-    balls.test1.body = self:makeBall(15.0, 15.0, 15.0, 5.0, 10.0)  
-    balls.test1.mat = ffi.new("double[16]")
-    p("Adding Ball...", balls.test1)
-    balls.test2.body = self:makeBall(10.0, 15.0, 14.0, 5.0, 10.0)    
-    balls.test2.mat = ffi.new("double[16]")
-    p("Adding Ball...", balls.test2)
-    balls.test3.body = self:makeBall(-15.0, 15.0, 12.0, 5.0, 10.0)    
-    balls.test3.mat = ffi.new("double[16]")
-    p("Adding Ball...", balls.test3)
+    boat = { hull1={}, hull2={} }
+    boat.hull1.body = self:makeBoatHull(-2.0, 0.5, 0.0, 0.5, 4.0, 4.0)  
+    boat.hull1.mat = ffi.new("double[16]")
+    p("Adding hull1...", boat.hull1)
+    boat.hull2.body = self:makeBoatHull(2.0, 0.5, 0.0, 0.5, 4.0, 4.0)  
+    boat.hull2.mat = ffi.new("double[16]")
+    p("Adding hull2...", boat.hull2)
     -- Set sim to unitialised.
     self.simInit = 0
 
@@ -342,6 +360,20 @@ end
 
 function simApp:Render()
 
+    self.motor1 = 0
+    self.motor2 = 0
+
+    -- Do some input checks here for applying force
+    if glfw.GetMouseButton( self.window, 0 ) == 1 then self.motor1 = 1 end
+    if glfw.GetMouseButton( self.window, 1 ) == 1 then self.motor2 = 1 end
+
+    local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(boat.hull1.body))
+    udata.motoron = self.motor1
+    gnewt.NewtonBodySetUserData(boat.hull1.body, udata)
+    local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(boat.hull2.body))
+    udata.motoron = self.motor2
+    gnewt.NewtonBodySetUserData(boat.hull2.body, udata)
+
     gl.glClear(bit.bor(gl.GL_COLOR_BUFFER_BIT, gl.GL_DEPTH_BUFFER_BIT))
 
     -- Setup the view of the cube. 
@@ -351,17 +383,11 @@ function simApp:Render()
     self:updateWorld()
 
     -- Go through the objects and update their visual. 
-    gnewt.NewtonBodyGetMatrix (balls.test1.body , balls.test1.mat)
-    self:updateBall( balls.test1 )
-    local pos = ffi.cast("dMatrix *", balls.test1.mat).m_posit
+    gnewt.NewtonBodyGetMatrix (boat.hull1.body , boat.hull1.mat)
+    self:updateHull( boat.hull1 )
 
-    gnewt.NewtonBodyGetMatrix (balls.test2.body , balls.test2.mat)
-    self:updateBall( balls.test2 )
-    local pos = ffi.cast("dMatrix *", balls.test2.mat).m_posit
-
-    gnewt.NewtonBodyGetMatrix (balls.test3.body , balls.test3.mat)
-    self:updateBall( balls.test3 )
-    local pos = ffi.cast("dMatrix *", balls.test3.mat).m_posit
+    gnewt.NewtonBodyGetMatrix (boat.hull2.body , boat.hull2.mat)
+    self:updateHull( boat.hull2 )
 
     -- Swap front and back buffers
     glfw.SwapBuffers(self.window)
