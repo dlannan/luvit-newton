@@ -30,52 +30,8 @@ local m_plane = ffi.new("double[4]", { [0]=0.0, 1.0, 0.0, 1.5 })
 local VISUAL    = 1
 
 ------------------------------------------------------------------------------------------------------------
-
--- local basicCarParameters = ffi.new("BasciCarParameters[1]", 
--- {
--- 	[0] = 2500.0,	-- MASS
--- 	100.0,	-- TIRE_MASS
--- 	25.0,	-- STEER_ANGLE
--- 	10000.0,	-- BRAKE_TORQUE
--- 	-0.6,	-- COM_Y_OFFSET
--- 	120.0,		-- TIRE_TOP_SPEED_KMH
--- 	400.0,	-- IDLE_TORQUE
--- 	500.0,		-- IDLE_TORQUE_RPM
--- 	500.0,	-- PEAK_TORQUE
--- 	3000.0,	-- PEAK_TORQUE_RPM
--- 	300.0,	-- PEAK_HP
--- 	4000.0,	-- PEAK_HP_RPM
--- 	50.0,		-- REDLINE_TORQUE
--- 	4500.0,	-- REDLINE_TORQUE_RPM
--- 	2.5,	-- GEAR_1
--- 	2.0,	-- GEAR_2
--- 	1.5,	-- GEAR_3
--- 	2.9,	-- REVERSE_GEAR
--- 	0.7,	-- SUSPENSION_LENGTH
--- 	700.0,	-- SUSPENSION_SPRING
--- 	40.0,	-- SUSPENSION_DAMPER
--- 	20.0,	-- LATERAL_STIFFNESS
--- 	10000.0,	-- LONGITUDINAL_STIFFNESS
--- 	1.5,	-- ALIGNING_MOMENT_TRAIL
--- 	gnewt.m_4WD,
---     identM
--- })
-
-------------------------------------------------------------------------------------------------------------
-
-local VehicleHullShape0 = ffi.new("double[8][3]",   
-{
-	{-2.3, 0.0, -0.9}, {-2.3, 0.0, 0.9}, {2.3, 0.0, -0.9}, {2.3, 0.0, 0.9},
-	{-2.1, 0.7, -0.9}, {-2.1, 0.7, 0.9}, {2.1, 0.7, -0.9}, {2.1, 0.7, 0.9},
-})
-
-------------------------------------------------------------------------------------------------------------
-
-local VehicleHullShape1 = ffi.new("double[8][3]",   
-{
-	{-1.5, 0.0, -0.9}, {-1.5, 0.0, 0.9}, {1.2, 0.0, -0.9}, {1.2, 0.0, 0.9},
-	{-1.1, 0.7, -0.9}, {-1.1, 0.7, 0.9}, {0.8, 0.7, -0.9}, {0.8, 0.7, 0.9},
-})
+-- Identity counter
+idc = 2
 
 ------------------------------------------------------------------------------------------------------------
 
@@ -197,8 +153,47 @@ function ApplyGravity(body, timestep, threadIndex)
     motorOn(body, udata[0].motoron)
 end
 
+
 ------------------------------------------------------------------------------------------------------------
-idc = 2
+
+function simApp:makePlatform( x, y, z, sx, sy, sz, mass )
+
+    local shapeId = idc 
+    idc = idc + 1
+
+    -- crate a collision plane
+    local offM = gutil.identityMatrix()
+    local coll = gnewt.NewtonCreateBox( self.client, sx, sy, sz, shapeId, ffi.cast("const double *const", offM))
+
+    -- create a dynamic body with a sphere shape, and 
+    local iM = gutil.identityMatrix()
+    iM[0].m_posit.m_x = x
+    iM[0].m_posit.m_y = y
+    iM[0].m_posit.m_z = z
+    local body = gnewt.NewtonCreateDynamicBody(self.client, coll, ffi.cast("const double *const", iM))
+    
+	-- set the force callback for applying the force and torque
+	gnewt.NewtonBodySetForceAndTorqueCallback(body, ffi.cast("NewtonApplyForceAndTorque", ApplyGravity))
+	-- set the mass for this body
+	gnewt.NewtonBodySetMassProperties(body, mass, coll)
+
+    local defMatId = gnewt.NewtonMaterialGetDefaultGroupID( self.client)
+    gnewt.NewtonBodySetMaterialGroupID(body, defMatId)
+
+	-- do no forget to destroy the collision after you not longer need it
+    gnewt.NewtonDestroyCollision(coll)
+
+    local udata = ffi.new("userData[1]")
+    udata[0] = { sy, mass, 0.0, 0.0 }
+    table.insert(self.userDataList, udata)
+
+    gnewt.NewtonBodySetUserData(body, udata)
+       
+	return body
+end
+
+------------------------------------------------------------------------------------------------------------
+
 
 function simApp:makeBoatHull( x, y, z, r, length, mass )
 
@@ -251,6 +246,20 @@ function simApp:updateHull( ball )
     local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(ball.body))
     vis:DrawCylinder( 8, 8, udata[0].length, udata[0].radius )
     --vis:DrawSphere(8, 8, udata[0].radius)
+    gl.glPopMatrix()
+end
+
+------------------------------------------------------------------------------------------------------------
+
+function simApp:updatePlatform( plat )
+
+    gl.glPushMatrix()
+    gl.glColor3f(0,0,1)
+
+    local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(plat.body))
+    local pos = ffi.cast("dMatrix *", plat.mat).m_posit
+    gl.glTranslatef(pos.m_x, pos.m_y - udata[0].radius * 0.5, pos.m_z)
+    vis:DrawPlane( 4, 2 )
     gl.glPopMatrix()
 end
 
@@ -338,13 +347,16 @@ function simApp:Startup()
     ------------------------------------------------------------------------------------------------------------
     -- Note: The visual shape doesnt seem to seperately instance for each object
     --       so each object shares the same visual shape because they are identical
-    boat = { hull1={}, hull2={} }
+    boat = { hull1={}, hull2={}, plat={} }
     boat.hull1.body = self:makeBoatHull(-2.0, 0.5, 0.0, 0.5, 4.0, 4.0)  
     boat.hull1.mat = ffi.new("double[16]")
     p("Adding hull1...", boat.hull1)
     boat.hull2.body = self:makeBoatHull(2.0, 0.5, 0.0, 0.5, 4.0, 4.0)  
     boat.hull2.mat = ffi.new("double[16]")
     p("Adding hull2...", boat.hull2)
+    boat.plat.body = self:makePlatform(0.0, 1.5, 2.0, 4.0, 0.1, 4.0, 10)  
+    boat.plat.mat = ffi.new("double[16]")
+    p("Adding platform...", boat.plat)
     -- Set sim to unitialised.
     self.simInit = 0
 
@@ -388,6 +400,9 @@ function simApp:Render()
 
     gnewt.NewtonBodyGetMatrix (boat.hull2.body , boat.hull2.mat)
     self:updateHull( boat.hull2 )
+
+    gnewt.NewtonBodyGetMatrix (boat.plat.body , boat.plat.mat)
+    self:updatePlatform( boat.plat )
 
     -- Swap front and back buffers
     glfw.SwapBuffers(self.window)
