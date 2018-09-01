@@ -60,39 +60,40 @@ function visual:Camera( x, y, z, tx, ty, tz, ux, uy, uz )
 end
 
 ------------------------------------------------------------------------------------------------------------
+-- Texture coordinates from bottom left to top right
+local cubetexels = ffi.new( "double[4][2]", { {u= 0, v= 0},
+										{u= 1, v= 0},
+										{u= 1, v= 1},
+										{u= 0, v= 1}} )
+-- Vertices used in cube
+local cubevertices = ffi.new( "double[8][3]", {[0]={-1.0, 1.0, 1.0},	
+											{ 1.0, 1.0, 1.0 },
+											{ 1.0,-1.0, 1.0 },
+											{-1.0,-1.0, 1.0 },
+											{-1.0, 1.0,-1.0 },
+											{ 1.0, 1.0,-1.0 },
+											{ 1.0,-1.0,-1.0 },
+											{-1.0,-1.0,-1.0 }} )
+													
+-- Faces of the cube
+local cubeindexes = ffi.new( "int[6][4]", {{0, 1, 2, 3},
+											{1, 5, 6, 2},
+											{4, 5, 1, 0},
+											{0, 3, 7, 4},
+											{3, 2, 6, 7},
+											{5, 4, 7, 6}} )
+-- Normals for each face of the cube
+-- Angle of normal and face is allways 90 degrees and
+-- length is allways 1.0!
+local cubenormals =ffi.new( "double[6][3]", {{ 0.0, 0.0, 1.0},
+											{ 1.0, 0.0, 0.0},
+											{ 0.0, 1.0, 0.0},
+											{-1.0, 0.0, 0.0},
+											{ 0.0,-1.0, 0.0},
+											{ 0.0, 0.0,-1.0}} )
 
 function visual:DrawCube(size)
-	-- Texture coordinates from bottom left to top right
-	local texels = ffi.new( "double[4][2]", { {u= 0, v= 0},
-                                            {u= 1, v= 0},
-                                            {u= 1, v= 1},
-                                            {u= 0, v= 1}} )
-	-- Vertices used in cube
-	local vertices = ffi.new( "double[8][3]", {[0]={-1.0, 1.0, 1.0},	
-                                                { 1.0, 1.0, 1.0 },
-                                                { 1.0,-1.0, 1.0 },
-                                                {-1.0,-1.0, 1.0 },
-                                                {-1.0, 1.0,-1.0 },
-                                                { 1.0, 1.0,-1.0 },
-                                                { 1.0,-1.0,-1.0 },
-                                                {-1.0,-1.0,-1.0 }} )
-                                                      
-    -- Faces of the cube
-	local cubeindexes = ffi.new( "int[6][4]", {{0, 1, 2, 3},
-                                              {1, 5, 6, 2},
-                                              {4, 5, 1, 0},
-                                              {0, 3, 7, 4},
-											  {3, 2, 6, 7},
-                                              {5, 4, 7, 6}} )
-	-- Normals for each face of the cube
-    -- Angle of normal and face is allways 90 degrees and
-    -- length is allways 1.0!
-	local cubenormals =ffi.new( "double[6][3]", {{ 0.0, 0.0, 1.0},
-                                                { 1.0, 0.0, 0.0},
-                                                { 0.0, 1.0, 0.0},
-                                                {-1.0, 0.0, 0.0},
-                                                { 0.0,-1.0, 0.0},
-                                                { 0.0, 0.0,-1.0}} )
+
 	-- Start rendering quads
 	gl.glBegin(gl.GL_QUADS)
 	for i=0,5 do
@@ -100,9 +101,9 @@ function visual:DrawCube(size)
 		gl.glNormal3fv(cubenormals[i][0])
 		for j=0,3 do
 			-- Texture coordinates for this vertex in texels
-			gl.glTexCoord2f(texels[j][0], texels[j][1])
+			gl.glTexCoord2f(cubetexels[j][0], cubetexels[j][1])
 			-- Position for this vertex, object position NOT world position
-			gl.glVertex3fv(vertices[cubeindexes[i][j]][0])
+			gl.glVertex3fv(cubevertices[cubeindexes[i][j]][0])
 		end
 		gl.glCheckForError()
 	end

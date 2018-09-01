@@ -16,14 +16,12 @@ glfw = require 'ffi/glfw' ('glfw3')
 GLFW = glfw.const
 
 local vis   = require("visualutils")
+local phys  = require("physics")
 
 ------------------------------------------------------------------------------------------------------------
 
 local simApp = {}
 local identM = gutil.identityMatrix()
-
-local m_waterToSolidVolumeRatio = 0.9
-local m_plane = ffi.new("double[4]", { [0]=0.0, 1.0, 0.0, 1.5 })
 
 ------------------------------------------------------------------------------------------------------------
 -- Comment this out to disable visual rendering
@@ -35,11 +33,11 @@ idc = 2
 
 ------------------------------------------------------------------------------------------------------------
 
-local Cred = ffi.new( "double[4]",{ [0]=1.0, 0.0, 0.0, 1.0 } )
-local Cgreen = ffi.new( "double[4]",{ [0]=0.0, 1.0, 0.0, 1.0 } )
-local Cblue = ffi.new( "double[4]",{ [0]=0.0, 0.0, 1.0, 1.0 } )
-local Cyellow = ffi.new( "double[4]",{ [0]=1.0, 1.0, 0.0, 1.0 } ) 
-local Ccyan = ffi.new( "double[4]",{ [0]=0.0, 1.0, 1.0, 1.0 } )
+local Cred      = ffi.new( "double[4]", { [0]=1.0, 0.0, 0.0, 1.0 } )
+local Cgreen    = ffi.new( "double[4]", { [0]=0.0, 1.0, 0.0, 1.0 } )
+local Cblue     = ffi.new( "double[4]", { [0]=0.0, 0.0, 1.0, 1.0 } )
+local Cyellow   = ffi.new( "double[4]", { [0]=1.0, 1.0, 0.0, 1.0 } ) 
+local Ccyan     = ffi.new( "double[4]", { [0]=0.0, 1.0, 1.0, 1.0 } )
 
 ------------------------------------------------------------------------------------------------------------
 
@@ -57,102 +55,65 @@ function simApp:makeGround( )
 
     -- start building the collision mesh
     gnewt.NewtonTreeCollisionBeginBuild (collision)
-
     -- add the face one at a time
     gnewt.NewtonTreeCollisionAddFace (collision, 4, ffi.cast("const double *const", points), 3 * ffi.sizeof("dFloat"), 0);
-
     -- finish building the collision
     gnewt.NewtonTreeCollisionEndBuild (collision, 1)
 
     -- create a body with a collision and locate at the identity matrix position 
     local body = gnewt.NewtonCreateDynamicBody(self.client, collision, ffi.cast("const double *const", identM))
-
     -- do no forget to destroy the collision after you not longer need it
-    gnewt.NewtonDestroyCollision(collision);
+    gnewt.NewtonDestroyCollision(collision)
 
     return body
 end
 
 ------------------------------------------------------------------------------------------------------------
-local pwr = 50.0
 
-function motorOn( body, enabled )
+function simApp:addBody( iM, mass, coll )
 
-    -- if enabled apply a force, otherwise nothing?
-    if enabled == 1 then 
-        local mat = ffi.new("double[16]")
-        gnewt.NewtonBodyGetMatrix( body, mat )
-        local force = ffi.new("double[3]", { [0]=mat[2] * pwr, mat[6] * pwr, mat[10] * pwr })
-        p(force[0], force[1], force[2])
-        gnewt.NewtonBodyAddForce( body, force )
-    end
+    local body = gnewt.NewtonCreateDynamicBody(self.client, coll, ffi.cast("const double *const", iM))
+    -- set the force callback for applying the force and torque
+    gnewt.NewtonBodySetForceAndTorqueCallback(body, ffi.cast("NewtonApplyForceAndTorque", ApplyGravity))
+    -- set the mass for this body
+    gnewt.NewtonBodySetMassProperties(body, mass, coll)
+
+    local defMatId = gnewt.NewtonMaterialGetDefaultGroupID( self.client )
+    gnewt.NewtonBodySetMaterialGroupID(body, defMatId)
+    return body
 end
 
 ------------------------------------------------------------------------------------------------------------
 
-function ApplyGravity(body, timestep, threadIndex)
+function simApp:addMotorToHull( hull, x, y, z, mass )
 
-	-- apply gravity force to the body
-    local mass = ffi.new("double[1]")
-	local Ixx = ffi.new("double[1]")
-	local Iyy = ffi.new("double[1]")
-    local Izz = ffi.new("double[1]")
+    local shapeId = idc 
+    idc = idc + 1
 
-    gnewt.NewtonBodyGetMass(body, mass, Ixx, Iyy, Izz)
+    local offM = gutil.identityMatrix()
+    local coll = gnewt.NewtonCreateBox( self.client, 0.1, 1.0, 1.0, shapeId, ffi.cast("const double *const", offM) )
 
-    local pos = ffi.new("double[4]")
-    gnewt.NewtonBodyGetPosition( body, pos )
+    -- create a dynamic body with a sphere shape, and 
+    local iM = gutil.identityMatrix()
+    iM[0].m_posit.m_x = x
+    iM[0].m_posit.m_y = y
+    iM[0].m_posit.m_z = z - 2.6
 
-    local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(body))
--- p(pos[0], pos[1], pos[2])
+    local body = self:addBody( iM, mass, coll )
+	-- do no forget to destroy the collision after you not longer need it
+    gnewt.NewtonDestroyCollision(coll)
 
-    -- Must be below the plane to apply buoyancy
-    if pos[1] < udata[0].radius then
-    local cog = ffi.new("dVector[1]")
-    cog[0] = { [0]=0.0, 0.0, 0.0, 0.0 }
-    local accelPerUnitMass = ffi.new("dVector[1]")
-    local torquePerUnitMass = ffi.new("dVector[1]")
-    local matrix = ffi.new("dMatrix[1]")
-    local gravity = ffi.new("double[4]", { [0]=0.0, -9.8, 0.0, 0.0 })
+    local udata = ffi.new("userData[1]")
+    udata[0] = { 0.5, mass, 0.5, 0.0 }
+    table.insert(self.userDataList, udata)
+    gnewt.NewtonBodySetUserData(body, udata)
 
-    gnewt.NewtonBodyGetMatrix (body, ffi.cast("dFloat *", matrix))
-    gnewt.NewtonBodyGetCentreOfMass(body, ffi.cast("dFloat *", cog))
-    cog = dMatrixTransformVector(matrix, cog)
-    --p("COG:", cog[0].m_x, cog[0].m_y, cog[0].m_z, cog[0].m_w)
+    -- local pinDir = ffi.new("double[4]", {0.0, 1.0, 0.0, 0.0})
+    -- local pivotPoint = ffi.new("double[4]", {0.0, 0.0, -2.0, 0.0})
 
-    local collision = gnewt.NewtonBodyGetCollision(body)
-    local shapeVolume = gnewt.NewtonConvexCollisionCalculateVolume(collision)
-    local fluidDensity = 1.0 / (m_waterToSolidVolumeRatio * shapeVolume)
-    local viscosity = 0.995
-
-    gnewt.NewtonConvexCollisionCalculateBuoyancyAcceleration (collision, 
-                ffi.cast("dFloat *", matrix), 
-                ffi.cast("dFloat *", cog), gravity, m_plane, fluidDensity, viscosity, 
-                ffi.cast("dFloat *", accelPerUnitMass), 
-                ffi.cast("dFloat *", torquePerUnitMass))
-
-    local force = dVectorScale(accelPerUnitMass, mass[0])
-    local torque = dVectorScale(torquePerUnitMass, mass[0])
-
-    local omega = ffi.new("dVector[1]")
-    omega[0] = { [0]=0.0, 0.0, 0.0, 0.0 }
-    gnewt.NewtonBodyGetOmega(body, ffi.cast("dFloat *", omega))
-    omega = dVectorScale (omega, viscosity)
-    gnewt.NewtonBodySetOmega(body, ffi.cast("dFloat *", omega))
-
-    gnewt.NewtonBodyAddForce (body, ffi.cast("dFloat *", force))
-    gnewt.NewtonBodyAddTorque (body, ffi.cast("dFloat *", torque))
-    
-    else
-
-	local gravityForce = ffi.new("double[4]", {[0]=0.0, -9.8 * mass[0], 0.0, 0.0})
-    gnewt.NewtonBodyAddForce(body, gravityForce)
-    end
-
-    -- Check motor forces
-    motorOn(body, udata[0].motoron)
+    --local joint = gnewt.NewtonConstraintCreateUpVector( self.client, pinDir, body )
+    return body
 end
-
 
 ------------------------------------------------------------------------------------------------------------
 
@@ -170,35 +131,25 @@ function simApp:makePlatform( x, y, z, sx, sy, sz, mass )
     iM[0].m_posit.m_x = x
     iM[0].m_posit.m_y = y
     iM[0].m_posit.m_z = z
-    local body = gnewt.NewtonCreateDynamicBody(self.client, coll, ffi.cast("const double *const", iM))
-    
-	-- set the force callback for applying the force and torque
-	gnewt.NewtonBodySetForceAndTorqueCallback(body, ffi.cast("NewtonApplyForceAndTorque", ApplyGravity))
-	-- set the mass for this body
-	gnewt.NewtonBodySetMassProperties(body, mass, coll)
 
-    local defMatId = gnewt.NewtonMaterialGetDefaultGroupID( self.client)
-    gnewt.NewtonBodySetMaterialGroupID(body, defMatId)
-
+    local body = self:addBody( iM, mass, coll )
 	-- do no forget to destroy the collision after you not longer need it
     gnewt.NewtonDestroyCollision(coll)
 
     local udata = ffi.new("userData[1]")
     udata[0] = { sy, mass, 0.0, 0.0 }
     table.insert(self.userDataList, udata)
-
-    gnewt.NewtonBodySetUserData(body, udata)
-       
+    gnewt.NewtonBodySetUserData(body, udata)       
 	return body
 end
 
 ------------------------------------------------------------------------------------------------------------
 
-
 function simApp:makeBoatHull( x, y, z, r, length, mass )
 
     local shapeId = idc 
     idc = idc + 1
+
 	-- crate a collision sphere
     local offM = gutil.identityMatrix()
     local coll = gnewt.NewtonCreateCapsule( self.client, r, r, length, shapeId, ffi.cast("const double *const", offM))
@@ -208,28 +159,15 @@ function simApp:makeBoatHull( x, y, z, r, length, mass )
     iM[0].m_posit.m_x = x
     iM[0].m_posit.m_y = y
     iM[0].m_posit.m_z = z
-	local body = gnewt.NewtonCreateDynamicBody(self.client, coll, ffi.cast("const double *const", iM))
 
-	-- set the force callback for applying the force and torque
-	gnewt.NewtonBodySetForceAndTorqueCallback(body, ffi.cast("NewtonApplyForceAndTorque", ApplyGravity))
-
-	-- set the mass for this body
-	gnewt.NewtonBodySetMassProperties(body, mass, coll)
-
-	-- set the linear damping to zero
-    -- gnewt.NewtonBodySetLinearDamping (body, 0.1)
-    local defMatId = gnewt.NewtonMaterialGetDefaultGroupID( self.client)
-    gnewt.NewtonBodySetMaterialGroupID(body, defMatId)
-
+    local body = self:addBody( iM, mass, coll )
 	-- do no forget to destroy the collision after you not longer need it
     gnewt.NewtonDestroyCollision(coll)
 
     local udata = ffi.new("userData[1]")
     udata[0] = { r, mass, length, 0.0 }
     table.insert(self.userDataList, udata)
-
     gnewt.NewtonBodySetUserData(body, udata)
-       
 	return body
 end
 
@@ -350,13 +288,18 @@ function simApp:Startup()
     boat = { hull1={}, hull2={}, plat={} }
     boat.hull1.body = self:makeBoatHull(-2.0, 0.5, 0.0, 0.5, 4.0, 4.0)  
     boat.hull1.mat = ffi.new("double[16]")
+    boat.hull1.motor = self:addMotorToHull( boat.hull1, -2.0, 0.5, 0.0, 2.0 )
     p("Adding hull1...", boat.hull1)
+
     boat.hull2.body = self:makeBoatHull(2.0, 0.5, 0.0, 0.5, 4.0, 4.0)  
     boat.hull2.mat = ffi.new("double[16]")
+    boat.hull2.motor = self:addMotorToHull( boat.hull2, 2.0, 0.5, 0.0, 2.0 )
     p("Adding hull2...", boat.hull2)
+
     boat.plat.body = self:makePlatform(0.0, 1.5, 2.0, 4.0, 0.1, 4.0, 10)  
     boat.plat.mat = ffi.new("double[16]")
     p("Adding platform...", boat.plat)
+
     -- Set sim to unitialised.
     self.simInit = 0
 
@@ -432,8 +375,6 @@ function simApp:Update( )
         -- Update the physics  -- Can use Async here, will look at later.
         gnewt.NewtonUpdate(self.client, dtime)
     end
-
-
 end
 
 ------------------------------------------------------------------------------------------------------------
