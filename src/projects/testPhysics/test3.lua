@@ -97,7 +97,7 @@ function simApp:addMotorToHull( hull, x, y, z, mass )
     local iM = gutil.identityMatrix()
     iM[0].m_posit.m_x = x
     iM[0].m_posit.m_y = y
-    iM[0].m_posit.m_z = z - 2.6
+    iM[0].m_posit.m_z = z-2.5
 
     local body = self:addBody( iM, mass, coll )
 	-- do no forget to destroy the collision after you not longer need it
@@ -108,11 +108,13 @@ function simApp:addMotorToHull( hull, x, y, z, mass )
     table.insert(self.userDataList, udata)
     gnewt.NewtonBodySetUserData(body, udata)
 
-    -- local pinDir = ffi.new("double[4]", {0.0, 1.0, 0.0, 0.0})
-    -- local pivotPoint = ffi.new("double[4]", {0.0, 0.0, -2.0, 0.0})
+    local pinDir0 = ffi.new("double[4]", {0.0, 1.0, 0.0, 0.0})
+    local pinDir1= ffi.new("double[4]", {0.0, 1.0, 0.0, 0.0})
+    local pivotPoint = ffi.new("double[4]", {x, y, z-2.5, 0.0})
 
-    --local joint = gnewt.NewtonConstraintCreateUpVector( self.client, pinDir, body )
-    return body
+    local joint = gnewt.NewtonConstraintCreateCorkscrew( self.client, pivotPoint, pinDir0, body, hull.body )
+    -- gnewt.NewtonCorkscrewSetUserCallback(joint, ffi.cast("NewtonCorkscrewCallback", MotorJointReady))
+    return body, joint
 end
 
 ------------------------------------------------------------------------------------------------------------
@@ -175,15 +177,24 @@ end
 
 function simApp:updateHull( ball )
 
+    gnewt.NewtonBodyGetMatrix (ball.body , ball.mat)
     gl.glPushMatrix()
     gl.glColor3f(1,0,0)
-
     local pos = ffi.cast("dMatrix *", ball.mat).m_posit
     gl.glTranslatef(pos.m_x, pos.m_y, pos.m_z)
-
     local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(ball.body))
     vis:DrawCylinder( 8, 8, udata[0].length, udata[0].radius )
     --vis:DrawSphere(8, 8, udata[0].radius)
+    gl.glPopMatrix()
+
+    local mat = ffi.new("double[16]")
+    gnewt.NewtonBodyGetMatrix (ball.motor , mat)
+    gl.glPushMatrix()
+    gl.glColor3f(1,0.5,0)
+    local pos = ffi.cast("dMatrix *", mat).m_posit
+    gl.glTranslatef(pos.m_x, pos.m_y, pos.m_z)
+    local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(ball.motor))
+    vis:DrawCubiod( 0.1, udata[0].radius, udata[0].length )
     gl.glPopMatrix()
 end
 
@@ -197,7 +208,7 @@ function simApp:updatePlatform( plat )
     local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(plat.body))
     local pos = ffi.cast("dMatrix *", plat.mat).m_posit
     gl.glTranslatef(pos.m_x, pos.m_y - udata[0].radius * 0.5, pos.m_z)
-    vis:DrawPlane( 4, 2 )
+    vis:DrawCubiod( 2.0, 0.2, 2.0 )
     gl.glPopMatrix()
 end
 
@@ -210,7 +221,7 @@ function simApp:updateWorld()
 
     gl.glTranslatef(0.0, 0.0, 0.0)
 
-    vis:DrawPlane(100, 5)
+    vis:DrawCubiod(50, 0.0, 50)
     gl.glPopMatrix()
 end
 
@@ -288,12 +299,12 @@ function simApp:Startup()
     boat = { hull1={}, hull2={}, plat={} }
     boat.hull1.body = self:makeBoatHull(-2.0, 0.5, 0.0, 0.5, 4.0, 4.0)  
     boat.hull1.mat = ffi.new("double[16]")
-    boat.hull1.motor = self:addMotorToHull( boat.hull1, -2.0, 0.5, 0.0, 2.0 )
+    boat.hull1.motor, boat.hull1.motorJ = self:addMotorToHull( boat.hull1, -2.0, 0.5, 0.0, 2.0 )
     p("Adding hull1...", boat.hull1)
 
     boat.hull2.body = self:makeBoatHull(2.0, 0.5, 0.0, 0.5, 4.0, 4.0)  
     boat.hull2.mat = ffi.new("double[16]")
-    boat.hull2.motor = self:addMotorToHull( boat.hull2, 2.0, 0.5, 0.0, 2.0 )
+    boat.hull2.motor, boat.hull2.motorJ = self:addMotorToHull( boat.hull2, 2.0, 0.5, 0.0, 2.0 )
     p("Adding hull2...", boat.hull2)
 
     boat.plat.body = self:makePlatform(0.0, 1.5, 2.0, 4.0, 0.1, 4.0, 10)  
@@ -338,10 +349,7 @@ function simApp:Render()
     self:updateWorld()
 
     -- Go through the objects and update their visual. 
-    gnewt.NewtonBodyGetMatrix (boat.hull1.body , boat.hull1.mat)
     self:updateHull( boat.hull1 )
-
-    gnewt.NewtonBodyGetMatrix (boat.hull2.body , boat.hull2.mat)
     self:updateHull( boat.hull2 )
 
     gnewt.NewtonBodyGetMatrix (boat.plat.body , boat.plat.mat)

@@ -27,6 +27,13 @@ end
 
 ------------------------------------------------------------------------------------------------------------
 
+function MotorJointReady( screw, slider )
+
+    return 0
+end
+
+------------------------------------------------------------------------------------------------------------
+
 function ApplyGravity(body, timestep, threadIndex)
 
 	-- apply gravity force to the body

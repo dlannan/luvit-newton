@@ -113,6 +113,46 @@ end
 
 ------------------------------------------------------------------------------------------------------------
 
+function visual:DrawCubiod( xw, zw, yw )
+
+	gl.glBegin(gl.GL_QUADS)
+	-- face 1
+	gl.glVertex3f(-xw,-zw,-yw) 
+	gl.glVertex3f(-xw,-zw,yw) 
+	gl.glVertex3f(xw,-zw,yw) 
+	gl.glVertex3f(xw,-zw,-yw) 
+	-- face 2 
+	gl.glVertex3f(xw,-zw,yw) 
+	gl.glVertex3f(xw,-zw,-yw) 
+	gl.glVertex3f(xw,zw,-yw) 
+	gl.glVertex3f(xw,zw,yw) 
+	-- face 3 
+	gl.glVertex3f(-xw,zw,-yw) 
+	gl.glVertex3f(-xw,zw,yw)
+	gl.glVertex3f(xw,zw,yw) 
+	gl.glVertex3f(xw,zw,-yw)
+	-- face 4 
+	gl.glVertex3f(-xw,-zw,yw) 
+	gl.glVertex3f(xw,-zw,yw) 
+	gl.glVertex3f(xw,zw,yw) 
+	gl.glVertex3f(-xw,zw,yw) 
+	-- face 5 
+	gl.glVertex3f(-xw,-zw,yw) 
+	gl.glVertex3f(-xw,-zw,-yw) 
+	gl.glVertex3f(-xw,zw,-yw) 
+	gl.glVertex3f(-xw,zw,yw) 
+	-- face 6 
+	gl.glVertex3f(-xw,-zw,-yw) 
+	gl.glVertex3f(xw,-zw,-yw) 
+	gl.glVertex3f(xw,zw,-yw) 
+	gl.glVertex3f(-xw,zw,-yw) 
+	gl.glEnd()
+
+	
+end
+
+------------------------------------------------------------------------------------------------------------
+
 function visual:DrawPlane(Size, Count)
     
     local HalfSize = Size * 0.5
