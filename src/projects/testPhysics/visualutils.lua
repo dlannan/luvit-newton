@@ -12,6 +12,18 @@ end
 
 ------------------------------------------------------------------------------------------------------------
 
+-- function visual:swizzleMatrix( mat )
+-- 	local matr = ffi.new( "double[16]", {
+-- 		mat[0], mat[1], mat[2], 0.0,
+-- 		mat[4], mat[5], mat[6], 0.0,
+-- 		mat[8], mat[9], mat[10], 0.0,
+-- 		mat[12], mat[13], mat[14], 1.0
+-- 	})
+-- 	return matr
+-- end
+
+------------------------------------------------------------------------------------------------------------
+
 function visual:crossProduct( a, b ) 
 
 	result = ffi.new("dVector", {
@@ -147,8 +159,6 @@ function visual:DrawCubiod( xw, zw, yw )
 	gl.glVertex3f(xw,zw,-yw) 
 	gl.glVertex3f(-xw,zw,-yw) 
 	gl.glEnd()
-
-	
 end
 
 ------------------------------------------------------------------------------------------------------------
@@ -260,13 +270,13 @@ function visual:DrawCylinder(NumMajor, NumMinor, Height, radius)
             local x = radius * math.cos(a)
             local y = radius * math.sin(a)
 
-            gl.glNormal3f(x / radius, y / radius, 0.0)
+            gl.glNormal3f(0.0, y / radius, x / radius)
             gl.glTexCoord2f(j / NumMinor, i / NumMajor)
-            gl.glVertex3f(x, y, z0)
+            gl.glVertex3f(z0, y, x)
 
-            gl.glNormal3f(x / radius, y / radius, 0.0)
+            gl.glNormal3f(0.0, y / radius, x / radius)
             gl.glTexCoord2f(j / NumMinor, (i + 1) / NumMajor)
-            gl.glVertex3f(x, y, z1)
+            gl.glVertex3f(z1, y, x)
         end
         gl.glEnd()
     end

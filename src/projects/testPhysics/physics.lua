@@ -44,56 +44,58 @@ function ApplyGravity(body, timestep, threadIndex)
 
     gnewt.NewtonBodyGetMass(body, mass, Ixx, Iyy, Izz)
 
-    local pos = ffi.new("double[4]")
-    gnewt.NewtonBodyGetPosition( body, pos )
-    local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(body))
+    if BUOYANCY == 1 then 
+
+        local pos = ffi.new("double[4]")
+        gnewt.NewtonBodyGetPosition( body, pos )
+        local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(body))
 -- p(udata[0], udata[1], udata[2])
 
-    -- Must be below the plane to apply buoyancy
-    if pos[1] < udata[0].radius then
+        -- Must be below the plane to apply buoyancy
+        if pos[1] < udata[0].radius then
 
-        local cog = ffi.new("dVector[1]")
-        cog[0] = { [0]=0.0, 0.0, 0.0, 0.0 }
-        local accelPerUnitMass = ffi.new("dVector[1]")
-        local torquePerUnitMass = ffi.new("dVector[1]")
-        local matrix = ffi.new("dMatrix[1]")
-        local gravity = ffi.new("double[4]", { [0]=0.0, -9.8, 0.0, 0.0 })
+            local cog = ffi.new("dVector[1]")
+            cog[0] = { [0]=0.0, 0.0, 0.0, 0.0 }
+            local accelPerUnitMass = ffi.new("dVector[1]")
+            local torquePerUnitMass = ffi.new("dVector[1]")
+            local matrix = ffi.new("dMatrix[1]")
+            local gravity = ffi.new("double[4]", { [0]=0.0, -9.8, 0.0, 0.0 })
 
-        gnewt.NewtonBodyGetMatrix (body, ffi.cast("dFloat *", matrix))
-        gnewt.NewtonBodyGetCentreOfMass(body, ffi.cast("dFloat *", cog))
-        cog = dMatrixTransformVector(matrix, cog)
-        --p("COG:", cog[0].m_x, cog[0].m_y, cog[0].m_z, cog[0].m_w)
+            gnewt.NewtonBodyGetMatrix (body, ffi.cast("dFloat *", matrix))
+            gnewt.NewtonBodyGetCentreOfMass(body, ffi.cast("dFloat *", cog))
+            cog = dMatrixTransformVector(matrix, cog)
+            --p("COG:", cog[0].m_x, cog[0].m_y, cog[0].m_z, cog[0].m_w)
 
-        local collision = gnewt.NewtonBodyGetCollision(body)
-        local shapeVolume = gnewt.NewtonConvexCollisionCalculateVolume(collision)
-        local fluidDensity = 1.0 / (m_waterToSolidVolumeRatio * shapeVolume)
-        local viscosity = 0.995
+            local collision = gnewt.NewtonBodyGetCollision(body)
+            local shapeVolume = gnewt.NewtonConvexCollisionCalculateVolume(collision)
+            local fluidDensity = 1.0 / (m_waterToSolidVolumeRatio * shapeVolume)
+            local viscosity = 0.995
 
-        gnewt.NewtonConvexCollisionCalculateBuoyancyAcceleration (collision, 
-                ffi.cast("dFloat *", matrix), 
-                ffi.cast("dFloat *", cog), gravity, m_plane, fluidDensity, viscosity, 
-                ffi.cast("dFloat *", accelPerUnitMass), 
-                ffi.cast("dFloat *", torquePerUnitMass))
+            gnewt.NewtonConvexCollisionCalculateBuoyancyAcceleration (collision, 
+                    ffi.cast("dFloat *", matrix), 
+                    ffi.cast("dFloat *", cog), gravity, m_plane, fluidDensity, viscosity, 
+                    ffi.cast("dFloat *", accelPerUnitMass), 
+                    ffi.cast("dFloat *", torquePerUnitMass))
 
-        local force = dVectorScale(accelPerUnitMass, mass[0])
-        local torque = dVectorScale(torquePerUnitMass, mass[0])
+            local force = dVectorScale(accelPerUnitMass, mass[0])
+            local torque = dVectorScale(torquePerUnitMass, mass[0])
 
-        local omega = ffi.new("dVector[1]")
-        omega[0] = { [0]=0.0, 0.0, 0.0, 0.0 }
-        gnewt.NewtonBodyGetOmega(body, ffi.cast("dFloat *", omega))
-        omega = dVectorScale (omega, viscosity)
-        gnewt.NewtonBodySetOmega(body, ffi.cast("dFloat *", omega))
+            local omega = ffi.new("dVector[1]")
+            omega[0] = { [0]=0.0, 0.0, 0.0, 0.0 }
+            gnewt.NewtonBodyGetOmega(body, ffi.cast("dFloat *", omega))
+            omega = dVectorScale (omega, viscosity)
+            gnewt.NewtonBodySetOmega(body, ffi.cast("dFloat *", omega))
 
-        gnewt.NewtonBodyAddForce (body, ffi.cast("dFloat *", force))
-        gnewt.NewtonBodyAddTorque (body, ffi.cast("dFloat *", torque))
-    else
+            gnewt.NewtonBodyAddForce (body, ffi.cast("dFloat *", force))
+            gnewt.NewtonBodyAddTorque (body, ffi.cast("dFloat *", torque))
+        end
 
-        local gravityForce = ffi.new("double[4]", {[0]=0.0, -9.8 * mass[0], 0.0, 0.0})
-        gnewt.NewtonBodyAddForce(body, gravityForce)
+        -- Check motor forces
+        motorOn(body, udata[0].motoron)
     end
 
-    -- Check motor forces
-    motorOn(body, udata[0].motoron)
+    local gravityForce = ffi.new("double[4]", {[0]=0.0, -9.8 * mass[0], 0.0, 0.0})
+    gnewt.NewtonBodyAddForce(body, gravityForce)
 end
 
 ------------------------------------------------------------------------------------------------------------
