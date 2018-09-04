@@ -18,6 +18,7 @@ end
 -- 		mat[4], mat[5], mat[6], 0.0,
 -- 		mat[8], mat[9], mat[10], 0.0,
 -- 		mat[12], mat[13], mat[14], 1.0
+
 -- 	})
 -- 	return matr
 -- end
@@ -31,6 +32,24 @@ function visual:crossProduct( a, b )
 		a.m_z*b.m_x - a.m_x*b.m_z,
 		a.m_x*b.m_y - a.m_y*b.m_x, 1.0 })
 	return result
+end
+
+------------------------------------------------------------------------------------------------------------
+
+function visual:rotationMatrix( inaxis, angle )
+	
+	local axis = self:normalize(inaxis)
+	local s = math.sin(angle)
+	local c = math.cos(angle)
+	local oc = 1.0 - c
+
+	local res = ffi.new("double[16]", {
+		oc * axis.m_x * axis.m_x + c, oc * axis.m_x * axis.m_y - axis.m_z * s, oc * axis.m_z * axis.m_x + axis.m_y * s, 0.0,
+		oc * axis.m_x * axis.m_y + axis.m_z * s,  oc * axis.m_y * axis.m_y + c, oc * axis.m_y * axis.m_z - axis.m_x * s, 0.0,
+		oc * axis.m_z * axis.m_x - axis.m_y * s,  oc * axis.m_y * axis.m_z + axis.m_x * s,  oc * axis.m_z * axis.m_z + c, 0.0,
+		0.0, 0.0, 0.0, 1.0 
+	})
+	return ffi.cast("dMatrix *", res)
 end
 
 ------------------------------------------------------------------------------------------------------------

@@ -96,7 +96,7 @@ function simApp:addMotorToHull( hull, x, y, z, mass )
 
     local coll = gnewt.NewtonCreateBox( self.client, 0.1, 1.0, 1.0, shapeId, nil )
 
-    -- create a dynamic body with a sphere shape, and 
+    -- create a dynamic body with a sphere shape, and     
     local iM = gutil.identityMatrix()
     iM[0].m_posit.m_x = x
     iM[0].m_posit.m_y = y
@@ -111,13 +111,13 @@ function simApp:addMotorToHull( hull, x, y, z, mass )
     table.insert(self.userDataList, udata)
     gnewt.NewtonBodySetUserData(body, udata)
 
-    -- local pinDir0 = ffi.new("double[4]", {0.0, 0.0, 1.0, 0.0})
-    -- local pinDir1= ffi.new("double[4]", {0.0, 1.0, 0.0, 0.0})
-    -- local pivotPoint = ffi.new("double[4]", {x, y, z-2.5, 0.0})
+    local pinDir0 = ffi.new("double[4]", {0.0, 0.0, 1.0, 0.0})
+    local pinDir1= ffi.new("double[4]", {0.0, 1.0, 0.0, 0.0})
+    local pivotPoint = ffi.new("double[4]", {x, y, z-2.5, 0.0})
 
-    -- local joint = gnewt.NewtonConstraintCreateCorkscrew( self.client, pivotPoint, pinDir0, body, hull.body )
+    local joint = gnewt.NewtonConstraintCreateCorkscrew( self.client, pivotPoint, pinDir0, body, hull.body )
     -- -- gnewt.NewtonCorkscrewSetUserCallback(joint, ffi.cast("NewtonCorkscrewCallback", MotorJointReady))
-    -- gnewt.NewtonJointSetStiffness( joint, 0.99 )
+    gnewt.NewtonJointSetStiffness( joint, 0.99 )
     return body, joint
 end
 
@@ -159,7 +159,9 @@ function simApp:makeBoatHull( x, y, z, r, length, mass )
     local coll = gnewt.NewtonCreateCapsule( self.client, r, r, length, shapeId, nil)
 
 	-- create a dynamic body with a sphere shape, and 
-    local iM = gutil.identityMatrix()
+    --local iM = gutil.identityMatrix()
+    local axis = ffi.new("dVector", {0.0, 1.0, 0.0, 0.0})
+    local iM = vis:rotationMatrix( axis, math.pi * 0.5 )
     iM[0].m_posit.m_x = x
     iM[0].m_posit.m_y = y
     iM[0].m_posit.m_z = z
@@ -211,7 +213,7 @@ function simApp:updatePlatform( plat )
 
     local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(plat.body))
     gl.glMultMatrixd(plat.mat)
-    vis:DrawCubiod( 2.0, 0.2, 2.0 )
+    vis:DrawCubiod( 2.0, 0.2, 1.0 )
     gl.glPopMatrix()
 end
 
@@ -310,7 +312,7 @@ function simApp:Startup()
     boat.hull2.motor, boat.hull2.motorJ = self:addMotorToHull( boat.hull2, 2.0, 1.5, 0.0, 2.0 )
     p("Adding hull2...", boat.hull2)
 
-    boat.plat.body = self:makePlatform(0.0, 2.5, 2.0, 4.0, 0.1, 4.0, 10)  
+    boat.plat.body = self:makePlatform(0.0, 2.5, 0.0, 4.0, 0.1, 2.0, 10)  
     boat.plat.mat = ffi.new("double[16]")
     p("Adding platform...", boat.plat)
 
