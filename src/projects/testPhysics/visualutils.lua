@@ -278,7 +278,7 @@ function visual:DrawCylinder(NumMajor, NumMinor, Height, radius)
     local MajorStep = Height / NumMajor
     local MinorStep = 2.0 * math.pi / NumMinor
 
-	for i = 0, NumMajor do
+	for i = 0, NumMajor-1 do
         local z0 = 0.5 * Height - i * MajorStep
         local z1 = z0 - MajorStep
 

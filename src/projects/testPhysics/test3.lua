@@ -111,7 +111,7 @@ function simApp:addMotorToHull( hull, x, y, z, mass )
     table.insert(self.userDataList, udata)
     gnewt.NewtonBodySetUserData(body, udata)
 
-    local pinDir0 = ffi.new("double[4]", {0.0, 0.0, 1.0, 0.0})
+    local pinDir0 = ffi.new("double[4]", {0.0, 1.0, 0.0, 0.0})
     local pinDir1= ffi.new("double[4]", {0.0, 1.0, 0.0, 0.0})
     local pivotPoint = ffi.new("double[4]", {x, y, z-2.5, 0.0})
 
@@ -226,7 +226,7 @@ function simApp:updateWorld()
 
     gl.glTranslatef(0.0, 0.0, 0.0)
 
-    vis:DrawCubiod(50, 0.0, 50)
+    vis:DrawCubiod(50, 0.1, 50)
     gl.glPopMatrix()
 end
 
