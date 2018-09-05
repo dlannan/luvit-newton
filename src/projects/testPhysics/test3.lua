@@ -138,7 +138,8 @@ function simApp:makePlatform( x, y, z, sx, sy, sz, mass )
     iM[0].m_posit.m_z = z
 
     local body = self:addBody( iM, mass, coll )
-	-- do no forget to destroy the collision after you not longer need it
+    -- do no forget to destroy the collision after you not longer need it
+        
     gnewt.NewtonDestroyCollision(coll)
 
     local udata = ffi.new("userData[1]")
@@ -146,6 +147,25 @@ function simApp:makePlatform( x, y, z, sx, sy, sz, mass )
     table.insert(self.userDataList, udata)
     gnewt.NewtonBodySetUserData(body, udata)       
 	return body
+end
+
+------------------------------------------------------------------------------------------------------------
+
+function simApp:makeBoat( hull1, hull2, plat )
+
+    idc = idc + 1
+    local coll = gnewt.NewtonCreateCompoundCollision( self.client, idc)
+    -- Make a heirarchy collidable object
+    local platC = gnewt.NewtonBodyGetCollision(plat.body)
+    local hull1C = gnewt.NewtonBodyGetCollision(hull1.body)
+    local hull2C = gnewt.NewtonBodyGetCollision(hull2.body)
+
+    gnewt.NewtonCompoundCollisionBeginAddRemove(coll)
+    gnewt.NewtonCompoundCollisionAddSubCollision(coll, platC)
+    gnewt.NewtonCompoundCollisionAddSubCollision(coll, hull1C)
+    gnewt.NewtonCompoundCollisionAddSubCollision(coll, hull2C)
+    gnewt.NewtonCompoundCollisionEndAddRemove(coll)
+    return coll
 end
 
 ------------------------------------------------------------------------------------------------------------
@@ -316,6 +336,7 @@ function simApp:Startup()
     boat.plat.mat = ffi.new("double[16]")
     p("Adding platform...", boat.plat)
 
+    boat.coll = self:makeBoat( boat.hull1, boat.hull2, boat.plat)
     -- Set sim to unitialised.
     self.simInit = 0
 
