@@ -96,30 +96,18 @@ function simApp:addMotorToHull( hull, x, y, z, mass )
 
     local coll = gnewt.NewtonCreateBox( self.client, 0.1, 1.0, 1.0, shapeId, nil )
 
-    -- create a dynamic body with a sphere shape, and     
-    local iM = gutil.identityMatrix()
-    iM[0].m_posit.m_x = x
-    iM[0].m_posit.m_y = y
-    iM[0].m_posit.m_z = z-2.5
-
-    local body = self:addBody( iM, mass, coll )
-	-- do no forget to destroy the collision after you not longer need it
-    gnewt.NewtonDestroyCollision(coll)
-
-    local udata = ffi.new("userData[1]")
-    udata[0] = { 0.5, mass, 0.5, 0.0 }
-    table.insert(self.userDataList, udata)
-    gnewt.NewtonBodySetUserData(body, udata)
-
     local pinDir0 = ffi.new("double[4]", {0.0, 1.0, 0.0, 0.0})
     local pinDir1= ffi.new("double[4]", {0.0, 1.0, 0.0, 0.0})
     local pivotPoint = ffi.new("double[4]", {x, y, z-2.5, 0.0})
 
-    local joint = gnewt.NewtonConstraintCreateCorkscrew( self.client, pivotPoint, pinDir0, body, hull.body )
+    --local joint = gnewt.NewtonConstraintCreateCorkscrew( self.client, pivotPoint, pinDir0, body, hull.body )   
+    --local joint = gnewt.NewtonConstraintCreateUpVector( self.client, pinDir0, body )
+
     -- -- gnewt.NewtonCorkscrewSetUserCallback(joint, ffi.cast("NewtonCorkscrewCallback", MotorJointReady))
-    gnewt.NewtonJointSetStiffness( joint, 0.99 )
-    return body, joint
+    --gnewt.NewtonJointSetStiffness( joint, 0.99 )
+    return coll, joint
 end
+
 
 ------------------------------------------------------------------------------------------------------------
 
@@ -130,42 +118,41 @@ function simApp:makePlatform( x, y, z, sx, sy, sz, mass )
 
     -- crate a collision plane
     local coll = gnewt.NewtonCreateBox( self.client, sx, sy, sz, shapeId, nil)
+	return coll
+end
 
-    -- create a dynamic body with a sphere shape, and 
+------------------------------------------------------------------------------------------------------------
+
+function simApp:makeBoat( colls, mass, x, y, z )
+
+    idc = idc + 1
+    local coll = gnewt.NewtonCreateCompoundCollision( self.client, idc )
+    gnewt.NewtonCompoundCollisionBeginAddRemove(coll)
+
+    for k,v in ipairs(colls) do
+        node = gnewt.NewtonCompoundCollisionAddSubCollision(coll, v)
+    end
+    gnewt.NewtonCompoundCollisionEndAddRemove(coll)
+
+    -- create a dynamic body with a sphere shape, and     
     local iM = gutil.identityMatrix()
     iM[0].m_posit.m_x = x
     iM[0].m_posit.m_y = y
     iM[0].m_posit.m_z = z
 
     local body = self:addBody( iM, mass, coll )
-    -- do no forget to destroy the collision after you not longer need it
-        
+	-- do no forget to destroy the collision after you not longer need it
     gnewt.NewtonDestroyCollision(coll)
+    for k,v in ipairs(colls) do
+        gnewt.NewtonDestroyCollision(v)
+    end
 
     local udata = ffi.new("userData[1]")
-    udata[0] = { sy, mass, 0.0, 0.0 }
+    udata[0] = { 3, mass, 0.5, 0.0 }
     table.insert(self.userDataList, udata)
-    gnewt.NewtonBodySetUserData(body, udata)       
-	return body
-end
+    gnewt.NewtonBodySetUserData(body, udata)
 
-------------------------------------------------------------------------------------------------------------
-
-function simApp:makeBoat( hull1, hull2, plat )
-
-    idc = idc + 1
-    local coll = gnewt.NewtonCreateCompoundCollision( self.client, idc)
-    -- Make a heirarchy collidable object
-    local platC = gnewt.NewtonBodyGetCollision(plat.body)
-    local hull1C = gnewt.NewtonBodyGetCollision(hull1.body)
-    local hull2C = gnewt.NewtonBodyGetCollision(hull2.body)
-
-    gnewt.NewtonCompoundCollisionBeginAddRemove(coll)
-    gnewt.NewtonCompoundCollisionAddSubCollision(coll, platC)
-    gnewt.NewtonCompoundCollisionAddSubCollision(coll, hull1C)
-    gnewt.NewtonCompoundCollisionAddSubCollision(coll, hull2C)
-    gnewt.NewtonCompoundCollisionEndAddRemove(coll)
-    return coll
+    return body
 end
 
 ------------------------------------------------------------------------------------------------------------
@@ -180,59 +167,52 @@ function simApp:makeBoatHull( x, y, z, r, length, mass )
 
 	-- create a dynamic body with a sphere shape, and 
     --local iM = gutil.identityMatrix()
-    local axis = ffi.new("dVector", {0.0, 1.0, 0.0, 0.0})
-    local iM = vis:rotationMatrix( axis, math.pi * 0.5 )
-    iM[0].m_posit.m_x = x
-    iM[0].m_posit.m_y = y
-    iM[0].m_posit.m_z = z
+    -- local axis = ffi.new("dVector", {0.0, 1.0, 0.0, 0.0})
+    -- local iM = vis:rotationMatrix( axis, math.pi * 0.5 )
+    -- iM[0].m_posit.m_x = x
+    -- iM[0].m_posit.m_y = y
+    -- iM[0].m_posit.m_z = z
 
-    local body = self:addBody( iM, mass, coll )
+    -- local body = self:addBody( iM, mass, coll )
 	-- do no forget to destroy the collision after you not longer need it
-    gnewt.NewtonDestroyCollision(coll)
+    -- gnewt.NewtonDestroyCollision(coll)
 
-    local udata = ffi.new("userData[1]")
-    udata[0] = { r, mass, length, 0.0 }
-    table.insert(self.userDataList, udata)
-    gnewt.NewtonBodySetUserData(body, udata)
-	return body
+    -- local udata = ffi.new("userData[1]")
+    -- udata[0] = { r, mass, length, 0.0 }
+    -- table.insert(self.userDataList, udata)
+    -- gnewt.NewtonBodySetUserData(body, udata)
+	return coll
 end
 
 ------------------------------------------------------------------------------------------------------------
 
-function simApp:updateHull( hull )
+function simApp:updateHull( x, y, z )
 
-    local mat = ffi.new("double[16]")
-
-    gnewt.NewtonBodyGetMatrix (hull.body , mat)
     gl.glPushMatrix()
     gl.glColor3f(1,0,0)
 
-    gl.glMultMatrixd(mat)
-    local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(hull.body))
-    vis:DrawCylinder( 8, 8, udata[0].length, udata[0].radius )
+    gl.glTranslated( x, y, z )
+    gl.glRotated( 90, 0.0, 1.0, 0.0 )
+    vis:DrawCylinder( 8, 8, 4.0, 0.5 )
     --vis:DrawSphere(8, 8, udata[0].radius)
     gl.glPopMatrix()
 
-    gnewt.NewtonBodyGetMatrix (hull.motor , mat)
     gl.glPushMatrix()
     gl.glColor3f(1,0.5,0)
 
-    gl.glMultMatrixd(mat)
-    local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(hull.motor))
-    vis:DrawCubiod( 0.1, udata[0].radius, udata[0].length )
+    gl.glTranslated( x, y, z - 2.5 )
+    vis:DrawCubiod( 0.1, 0.5, 0.5 )
     gl.glPopMatrix()
 end
 
 ------------------------------------------------------------------------------------------------------------
 
-function simApp:updatePlatform( plat )
+function simApp:updatePlatform( x, y, z )
 
-    gnewt.NewtonBodyGetMatrix (plat.body , plat.mat)
     gl.glPushMatrix()
     gl.glColor3f(0,0,1)
 
-    local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(plat.body))
-    gl.glMultMatrixd(plat.mat)
+    gl.glTranslated(x, y, z)
     vis:DrawCubiod( 2.0, 0.2, 1.0 )
     gl.glPopMatrix()
 end
@@ -249,6 +229,21 @@ function simApp:updateWorld()
     vis:DrawCubiod(50, 0.1, 50)
     gl.glPopMatrix()
 end
+
+------------------------------------------------------------------------------------------------------------
+
+function simApp:updateBoat( body )
+
+    local mat = ffi.new("double[16]")
+    gnewt.NewtonBodyGetMatrix (body , mat)
+
+    gl.glPushMatrix()
+    gl.glMultMatrixd(mat)
+    self:updateHull( -2, 0.0, 0.0 )
+    self:updateHull( 2, 0.0, 0.0 )
+    self:updatePlatform( 0.0, 1.0, 0.0 )
+    gl.glPopMatrix()
+end    
 
 ------------------------------------------------------------------------------------------------------------
 
@@ -311,7 +306,7 @@ function simApp:Startup()
     -- create a static body to serve as the floor.
     --world.physId = 1
     --p("Adding world...", world.physId)   
-    world.phys = self:makeGround( world.physId )
+    --world.phys = self:makeGround( world.physId )
 
     ------------------------------------------------------------------------------------------------------------
     -- Some timers for use later
@@ -322,21 +317,22 @@ function simApp:Startup()
     -- Note: The visual shape doesnt seem to seperately instance for each object
     --       so each object shares the same visual shape because they are identical
     boat = { hull1={}, hull2={}, plat={} }
-    boat.hull1.body = self:makeBoatHull(-2, 1.5, 0.0, 0.5, 4.0, 4.0)  
+    boat.hull1.coll = self:makeBoatHull(-2, 1.5, 0.0, 0.5, 4.0, 4.0)  
     boat.hull1.mat = ffi.new("double[16]")
     boat.hull1.motor, boat.hull1.motorJ = self:addMotorToHull( boat.hull1, -2.0, 1.5, 0.0, 2.0 )
     p("Adding hull1...", boat.hull1)
 
-    boat.hull2.body = self:makeBoatHull(2.0, 1.5, 0.0, 0.5, 4.0, 4.0)  
+    boat.hull2.coll = self:makeBoatHull(2.0, 1.5, 0.0, 0.5, 4.0, 4.0)  
     boat.hull2.mat = ffi.new("double[16]")
     boat.hull2.motor, boat.hull2.motorJ = self:addMotorToHull( boat.hull2, 2.0, 1.5, 0.0, 2.0 )
     p("Adding hull2...", boat.hull2)
 
-    boat.plat.body = self:makePlatform(0.0, 2.5, 0.0, 4.0, 0.1, 2.0, 10)  
+    boat.plat.coll = self:makePlatform(0.0, 2.5, 0.0, 4.0, 0.1, 2.0, 10)  
     boat.plat.mat = ffi.new("double[16]")
     p("Adding platform...", boat.plat)
 
-    boat.coll = self:makeBoat( boat.hull1, boat.hull2, boat.plat)
+    local colls = { boat.hull1.coll, boat.hull2.coll, boat.plat.coll, boat.hull1.motor, boat.hull2.motor }
+    boat.body = self:makeBoat( colls, 14.0, 0.0, 2.0, 0.0 )
     -- Set sim to unitialised.
     self.simInit = 0
 
@@ -359,12 +355,12 @@ function simApp:Render()
     if glfw.GetMouseButton( self.window, 0 ) == 1 then self.motor1 = 1 end
     if glfw.GetMouseButton( self.window, 1 ) == 1 then self.motor2 = 1 end
 
-    local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(boat.hull1.body))
-    udata.motoron = self.motor1
-    gnewt.NewtonBodySetUserData(boat.hull1.body, udata)
-    local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(boat.hull2.body))
-    udata.motoron = self.motor2
-    gnewt.NewtonBodySetUserData(boat.hull2.body, udata)
+    -- local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(boat.hull1.body))
+    -- udata.motoron = self.motor1
+    -- gnewt.NewtonBodySetUserData(boat.hull1.body, udata)
+    -- local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(boat.hull2.body))
+    -- udata.motoron = self.motor2
+    -- gnewt.NewtonBodySetUserData(boat.hull2.body, udata)
 
     gl.glClear(bit.bor(gl.GL_COLOR_BUFFER_BIT, gl.GL_DEPTH_BUFFER_BIT))
 
@@ -375,9 +371,7 @@ function simApp:Render()
     self:updateWorld()
 
     -- Go through the objects and update their visual. 
-    self:updateHull( boat.hull1 )
-    self:updateHull( boat.hull2 )
-    self:updatePlatform( boat.plat )
+    self:updateBoat(boat.body)
 
     -- Swap front and back buffers
     glfw.SwapBuffers(self.window)

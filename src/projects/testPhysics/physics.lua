@@ -6,7 +6,7 @@ gutil = newton[2]
 
 ------------------------------------------------------------------------------------------------------------
 
-local m_waterToSolidVolumeRatio = 0.9
+local m_waterToSolidVolumeRatio = 0.1
 local m_plane = ffi.new("double[4]", { [0]=0.0, 1.0, 0.0, 1.5 })
 
 ------------------------------------------------------------------------------------------------------------
@@ -49,7 +49,7 @@ function ApplyGravity(body, timestep, threadIndex)
         local pos = ffi.new("double[4]")
         gnewt.NewtonBodyGetPosition( body, pos )
         local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(body))
--- p(udata[0], udata[1], udata[2])
+p(udata[0].radius, mass)
 
         -- Must be below the plane to apply buoyancy
         if pos[1] < udata[0].radius then
@@ -91,7 +91,7 @@ function ApplyGravity(body, timestep, threadIndex)
         end
 
         -- Check motor forces
-        motorOn(body, udata[0].motoron)
+        --motorOn(body, udata[0].motoron)
     end
 
     local gravityForce = ffi.new("double[4]", {[0]=0.0, -9.8 * mass[0], 0.0, 0.0})
