@@ -146,7 +146,7 @@ function simApp:makeBoat( colls, mass, x, y, z )
     end
 
     local udata = ffi.new("userData[1]")
-    udata[0] = { 1.0, mass, 0.5, 0.0 }
+    udata[0] = { 0.7, mass, 0.5, 0.0 }
     table.insert(self.userDataList, udata)
     gnewt.NewtonBodySetUserData(body, udata)
 
@@ -335,7 +335,7 @@ function simApp:Startup()
     p("Adding platform...", boat.plat)
 
     local colls = { boat.hull1.coll, boat.hull2.coll, boat.plat.coll, boat.hull1.motor, boat.hull2.motor }
-    boat.body = self:makeBoat( colls, 14.0, 0.0, 1.0, 0.0 )
+    boat.body = self:makeBoat( colls, 14.0, 0.0, .81, 0.0 )
     -- Set sim to unitialised.
     self.simInit = 0
 
@@ -362,7 +362,10 @@ function simApp:Render()
 
     -- Setup the view of the cube. 
     vis:Perspective( 60.0, 1.0, 0.5, 100.0 )   
-    vis:Camera( -7.0, 5.0, -7.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0 )
+
+    local mat = ffi.new("double[16]")
+    gnewt.NewtonBodyGetMatrix (boat.body , mat)
+    vis:Camera( -7.0, 5.0, -7.0, mat[12], mat[13], mat[14], 0.0, 1.0, 0.0 )
     
     self:updateWorld()
 
