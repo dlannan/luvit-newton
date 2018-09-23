@@ -103,8 +103,6 @@ function simApp:addMotorToHull( hull, x, y, z, mass )
     --local joint = gnewt.NewtonConstraintCreateCorkscrew( self.client, pivotPoint, pinDir0, body, hull.body )   
     --local joint = gnewt.NewtonConstraintCreateUpVector( self.client, pinDir0, body )
 
-    -- -- gnewt.NewtonCorkscrewSetUserCallback(joint, ffi.cast("NewtonCorkscrewCallback", MotorJointReady))
-    --gnewt.NewtonJointSetStiffness( joint, 0.99 )
     return coll, joint
 end
 
@@ -148,7 +146,7 @@ function simApp:makeBoat( colls, mass, x, y, z )
     end
 
     local udata = ffi.new("userData[1]")
-    udata[0] = { 3, mass, 0.5, 0.0 }
+    udata[0] = { 1.0, mass, 0.5, 0.0 }
     table.insert(self.userDataList, udata)
     gnewt.NewtonBodySetUserData(body, udata)
 
@@ -165,22 +163,6 @@ function simApp:makeBoatHull( x, y, z, r, length, mass )
 	-- crate a collision sphere
     local coll = gnewt.NewtonCreateCapsule( self.client, r, r, length, shapeId, nil)
 
-	-- create a dynamic body with a sphere shape, and 
-    --local iM = gutil.identityMatrix()
-    -- local axis = ffi.new("dVector", {0.0, 1.0, 0.0, 0.0})
-    -- local iM = vis:rotationMatrix( axis, math.pi * 0.5 )
-    -- iM[0].m_posit.m_x = x
-    -- iM[0].m_posit.m_y = y
-    -- iM[0].m_posit.m_z = z
-
-    -- local body = self:addBody( iM, mass, coll )
-	-- do no forget to destroy the collision after you not longer need it
-    -- gnewt.NewtonDestroyCollision(coll)
-
-    -- local udata = ffi.new("userData[1]")
-    -- udata[0] = { r, mass, length, 0.0 }
-    -- table.insert(self.userDataList, udata)
-    -- gnewt.NewtonBodySetUserData(body, udata)
 	return coll
 end
 
@@ -232,7 +214,28 @@ end
 
 ------------------------------------------------------------------------------------------------------------
 
-function simApp:updateBoat( body )
+function simApp:updateBoat( body, tdiff, speed )
+
+    local mat = ffi.new("double[16]")
+    gnewt.NewtonBodyGetMatrix (body , mat)
+
+    if self.motor1 == 1 then
+        local m1vel = ffi.new("double[4]", { mat[8] * speed, mat[9] * speed, mat[10] * speed })
+        local m1vec = ffi.new("double[4]", { -2, 0.0, -2.5 })
+        local mvec = dMatrixTransformVector( ffi.cast("dMatrix *", mat), ffi.cast("dVector *", m1vec) )
+        gnewt.NewtonBodyAddImpulse(boat.body, m1vel, ffi.cast("double *", mvec), tdiff)
+    end
+    if self.motor2 == 1 then
+        local m2vel = ffi.new("double[4]", { mat[8] * speed, mat[9] * speed, mat[10] * speed })
+        local m2vec = ffi.new("double[4]", { 2, 0.0, -2.5 })
+        local mvec = dMatrixTransformVector( ffi.cast("dMatrix *", mat), ffi.cast("dVector *", m2vec) )
+        gnewt.NewtonBodyAddImpulse(boat.body, m2vel, ffi.cast("double *", mvec), tdiff)
+    end
+end
+
+------------------------------------------------------------------------------------------------------------
+
+function simApp:renderBoat( body, tdiff )
 
     local mat = ffi.new("double[16]")
     gnewt.NewtonBodyGetMatrix (body , mat)
@@ -332,7 +335,7 @@ function simApp:Startup()
     p("Adding platform...", boat.plat)
 
     local colls = { boat.hull1.coll, boat.hull2.coll, boat.plat.coll, boat.hull1.motor, boat.hull2.motor }
-    boat.body = self:makeBoat( colls, 14.0, 0.0, 2.0, 0.0 )
+    boat.body = self:makeBoat( colls, 14.0, 0.0, 1.0, 0.0 )
     -- Set sim to unitialised.
     self.simInit = 0
 
@@ -355,13 +358,6 @@ function simApp:Render()
     if glfw.GetMouseButton( self.window, 0 ) == 1 then self.motor1 = 1 end
     if glfw.GetMouseButton( self.window, 1 ) == 1 then self.motor2 = 1 end
 
-    -- local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(boat.hull1.body))
-    -- udata.motoron = self.motor1
-    -- gnewt.NewtonBodySetUserData(boat.hull1.body, udata)
-    -- local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(boat.hull2.body))
-    -- udata.motoron = self.motor2
-    -- gnewt.NewtonBodySetUserData(boat.hull2.body, udata)
-
     gl.glClear(bit.bor(gl.GL_COLOR_BUFFER_BIT, gl.GL_DEPTH_BUFFER_BIT))
 
     -- Setup the view of the cube. 
@@ -370,8 +366,11 @@ function simApp:Render()
     
     self:updateWorld()
 
+    local time_current = os.clock()
+    local dtime = time_current - self.time_last
+    
     -- Go through the objects and update their visual. 
-    self:updateBoat(boat.body)
+    self:renderBoat(boat.body)
 
     -- Swap front and back buffers
     glfw.SwapBuffers(self.window)
@@ -395,6 +394,9 @@ function simApp:Update( )
     local time_current = os.clock()
     local dtime = time_current - self.time_last
     self.time_last = time_current
+
+    -- Go through the objects and update their visual. 
+    self:updateBoat(boat.body, dtime, 0.2)
 
     if self.client ~= nil then
         --p("tstep:", dtime)
