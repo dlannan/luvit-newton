@@ -93,12 +93,14 @@ end
 
 ------------------------------------------------------------------------------------------------------------
 
-function simApp:makeBrick( x, y, z, l, h, w)
+function simApp:makeBrick( x, y, z, l, h, w, a)
 
     idc = idc + 1
     local coll = gnewt.NewtonCreateBox( self.client, l, h, w, idc, nil )
     -- create a dynamic body with a sphere shape, and     
-    local iM = gutil.identityMatrix()
+    --local iM = gutil.identityMatrix()
+    local xaxis = ffi.new("dVector", { 0.0, 1.0, 0.0 })
+    local iM = vis:rotationMatrix( xaxis, -a)    
     iM[0].m_posit.m_x = x
     iM[0].m_posit.m_y = y
     iM[0].m_posit.m_z = z
@@ -116,15 +118,18 @@ function simApp:makeWall( x, y, z, length, height )
     local bodies = {}
 
     local bid = 1
+    local piseg = math.pi * 2.0
 
     for h=1, height, 1 do
-        local xstart = x - length * 0.5 + ( h % 2 ) * 0.5
+        local xstart = ( h % 2 ) * 0.9
 
         for l=1, length, 1 do
 
-            local x = xstart + (l-1)
+            local a = xstart + ((l-1)) / length * piseg
+            local x = math.sin( a ) * 1.6
+            local z = math.cos( a ) * 1.6 + z
             local y = ystart + (h-1) * 0.5 + 0.25
-            bodies[bid] = self:makeBrick( x, y, z, 1, 0.5, 0.5 )
+            bodies[bid] = self:makeBrick( x, y, z, 1, 0.5, 0.5, a )
             bid = bid + 1   
         end
     end
@@ -270,7 +275,7 @@ function simApp:Startup()
 
     ------------------------------------------------------------------------------------------------------------
     -- Make the wall
-    self.wall = self:makeWall( 0, 0.1, 5, 10, 7 )
+    self.wall = self:makeWall( 0, 0.1, 5, 10, 10 )
     -- Set sim to unitialised.
     self.simInit = 0
 
