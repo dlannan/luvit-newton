@@ -20,6 +20,7 @@ function motorOn( body, enabled )
         local mat = ffi.new("double[16]")
         gnewt.NewtonBodyGetMatrix( body, mat )
         local force = ffi.new("double[3]", { [0]=mat[2] * pwr, mat[6] * pwr, mat[10] * pwr })
+        p(force[0], force[1], force[2])
         gnewt.NewtonBodyAddForce( body, force )
     end
 end
@@ -41,12 +42,13 @@ function ApplyGravity(body, timestep, threadIndex)
 	local Iyy = ffi.new("double[1]")
     local Izz = ffi.new("double[1]")
 
-    local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(body))
     gnewt.NewtonBodyGetMass(body, mass, Ixx, Iyy, Izz)
-    local pos = ffi.new("double[4]")
-    gnewt.NewtonBodyGetPosition( body, pos )
 
     if BUOYANCY == 1 then 
+
+        local pos = ffi.new("double[4]")
+        gnewt.NewtonBodyGetPosition( body, pos )
+        local udata = ffi.cast("userData *", gnewt.NewtonBodyGetUserData(body))
 
         -- Must be below the plane to apply buoyancy
         if pos[1] < udata[0].radius then
@@ -91,10 +93,8 @@ function ApplyGravity(body, timestep, threadIndex)
         --motorOn(body, udata[0].motoron)
     end
 
-    if pos[1] >= udata[0].radius then
-        local gravityForce = ffi.new("double[4]", {[0]=0.0, -9.8 * mass[0], 0.0, 0.0})
-        gnewt.NewtonBodyAddForce(body, gravityForce)
-    end
+    local gravityForce = ffi.new("double[4]", {[0]=0.0, -9.8 * mass[0], 0.0, 0.0})
+    gnewt.NewtonBodyAddForce(body, gravityForce)
 end
 
 ------------------------------------------------------------------------------------------------------------
