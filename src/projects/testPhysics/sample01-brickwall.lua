@@ -30,6 +30,10 @@ local identM = gutil.identityMatrix()
 ------------------------------------------------------------------------------------------------------------
 -- Comment this out to disable visual rendering
 local VISUAL    = 1
+local BRICKMASS = 0.5
+local BALLMASS  = 5
+
+local Cam = { x=0.0, y=3.0, z=-5.0 }
 
 ------------------------------------------------------------------------------------------------------------
 -- Identity counter
@@ -48,10 +52,10 @@ local Ccyan     = ffi.new( "double[4]", { [0]=0.0, 1.0, 1.0, 1.0 } )
 function simApp:makeGround( )
 
     local points = ffi.new("dFloat[4][3]", {
-        {-100.0, 0.0,  100.0}, 
-        { 100.0, 0.0,  100.0}, 
-        { 100.0, 0.0, -100.0}, 
-        {-100.0, 0.0, -100.0}, 
+        {-100.0, 0.1,  100.0}, 
+        { 100.0, 0.1,  100.0}, 
+        { 100.0, 0.1, -100.0}, 
+        {-100.0, 0.1, -100.0}, 
     })
 
     -- crate a collision tree
@@ -77,13 +81,30 @@ end
 function simApp:addBody( iM, mass, coll )
 
     local body = gnewt.NewtonCreateDynamicBody(self.client, coll, ffi.cast("const double *const", iM))
-    -- set the force callback for applying the force and torque
-    gnewt.NewtonBodySetForceAndTorqueCallback(body, ffi.cast("NewtonApplyForceAndTorque", ApplyGravity))
     -- set the mass for this body
     gnewt.NewtonBodySetMassProperties(body, mass, coll)
+    -- set the force callback for applying the force and torque
+    gnewt.NewtonBodySetForceAndTorqueCallback(body, ffi.cast("NewtonApplyForceAndTorque", ApplyGravity))
 
     local defMatId = gnewt.NewtonMaterialGetDefaultGroupID( self.client )
     gnewt.NewtonBodySetMaterialGroupID(body, defMatId)
+    return body
+end
+
+------------------------------------------------------------------------------------------------------------
+
+function simApp:makeBrick( x, y, z, l, h, w)
+
+    idc = idc + 1
+    local coll = gnewt.NewtonCreateBox( self.client, l, h, w, idc, nil )
+    -- create a dynamic body with a sphere shape, and     
+    local iM = gutil.identityMatrix()
+    iM[0].m_posit.m_x = x
+    iM[0].m_posit.m_y = y
+    iM[0].m_posit.m_z = z
+    local body = self:addBody( iM, BRICKMASS, coll )
+    -- do no forget to destroy the collision after you not longer need it
+    gnewt.NewtonDestroyCollision(coll)
     return body
 end
 
@@ -94,56 +115,62 @@ function simApp:makeWall( x, y, z, length, height )
     local ystart = y
     local bodies = {}
 
-    idc = idc + 1
-    local coll = gnewt.NewtonCreateBox( self.client, 0.5, 0.25, 0.25, idc, nil )
+    local bid = 1
 
-    --for h=1, height * 2, 1 do
-    local h = 1
+    for h=1, height, 1 do
         local xstart = x - length * 0.5 + ( h % 2 ) * 0.5
 
         for l=1, length, 1 do
 
-            -- create a dynamic body with a sphere shape, and     
-            local iM = gutil.identityMatrix()
-            iM[0].m_posit.m_x = 0.0 --xstart + (l-1)
-            iM[0].m_posit.m_y = 1.0 --ystart + (h-1) * 0.5 + 0.25
-            iM[0].m_posit.m_z = z
-            local body = self:addBody( iM, 0.5, coll )
-            bodies[idc] = body
+            local x = xstart + (l-1)
+            local y = ystart + (h-1) * 0.5 + 0.25
+            bodies[bid] = self:makeBrick( x, y, z, 1, 0.5, 0.5 )
+            bid = bid + 1   
         end
-        --end
-    -- do no forget to destroy the collision after you not longer need it
-    gnewt.NewtonDestroyCollision(coll)
+    end
+
     return bodies
 end
 
 ------------------------------------------------------------------------------------------------------------
 
-function simApp:shootBall( x, y, z, r, mass, speed )
+function simApp:shootBall( r, mass, speed )
+
+    if self.ball then gnewt.NewtonDestroyBody(self.ball) end
 
     local shapeId = idc 
     idc = idc + 1
 
 	-- crate a collision sphere
-    local coll = gnewt.NewtonCreateCapsule( self.client, r, r, length, shapeId, nil)
+    local coll = gnewt.NewtonCreateSphere( self.client, r, shapeId, nil)
+    local iM = gutil.identityMatrix()
+    iM[0].m_posit.m_x = Cam.x
+    iM[0].m_posit.m_y = Cam.y
+    iM[0].m_posit.m_z = Cam.z
+    local body = self:addBody( iM, mass, coll )
+    -- do no forget to destroy the collision after you not longer need it
+    gnewt.NewtonDestroyCollision(coll)
 
-	return coll
+    local dir = ffi.new("double[3]", { [0]=0.0, 0.0, speed })
+    local pos = ffi.new("double[3]", { [0]=0.0, 0.0, 0.0 })
+    gnewt.NewtonBodyAddImpulse( body, dir, pos, 0.016 )
+
+	return body
 end
 
 ------------------------------------------------------------------------------------------------------------
 
 function simApp:renderWall( wall )
 
-    for k,v in ipairs(wall) do
-
+    for k,v in pairs(wall) do
         local mat = ffi.new("double[16]")
         gnewt.NewtonBodyGetMatrix (v , mat)
 
         gl.glPushMatrix()
-        gl.glColor3f(1,0.5,0)
+        gl.glColor3f(1, (k % 5) / 5.0, 0.0)
 
-        gl.glTranslated( mat[12], mat[13], mat[14] )
-        vis:DrawCubiod( 0.25, 0.25, 0.5 )
+        gl.glMultMatrixd( mat )
+        vis:DrawCubiod( 0.5, 0.25, 0.25 )
         gl.glPopMatrix()
     end
 end
@@ -152,11 +179,14 @@ end
 
 function simApp:renderBall( ball )
 
+    local mat = ffi.new("double[16]")
+    gnewt.NewtonBodyGetMatrix (ball , mat)
+
     gl.glPushMatrix()
     gl.glColor3f(0,0,1)
 
-    gl.glTranslated(x, y, z)
-    vis:DrawSphere( 5, 5, 0.3 )
+    gl.glMultMatrixd( mat )
+    vis:DrawSphere( 10, 10, 0.5 )
     gl.glPopMatrix()
 end
 
@@ -240,7 +270,7 @@ function simApp:Startup()
 
     ------------------------------------------------------------------------------------------------------------
     -- Make the wall
-    self.wall = self:makeWall( 0, 0, -10, 1, 1 )
+    self.wall = self:makeWall( 0, 0.1, 5, 10, 7 )
     -- Set sim to unitialised.
     self.simInit = 0
 
@@ -260,7 +290,7 @@ function simApp:Render()
 
     -- Setup the view of the cube. 
     vis:Perspective( 60.0, 1.0, 0.5, 100.0 )   
-    vis:Camera( -7.0, 5.0, -7.0, 0, 2, -10, 0.0, 1.0, 0.0 )
+    vis:Camera( Cam.x, Cam.y, Cam.z, 0, 1, 5, 0.0, 1.0, 0.0 )
 
     self:renderWorld()
 
@@ -296,7 +326,7 @@ function simApp:Update( )
 
     -- Do some input checks here for applying force
     if glfw.GetMouseButton( self.window, 0 ) == 1 then
-        self.ball = self:shootBall()
+        self.ball = self:shootBall(0.5, 5, 20)
     end
 
     if self.client ~= nil then
